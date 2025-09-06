@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "drizzle-kit": "^0.31.4",
+    "mkcert": "^3.2.0",
+    "studio": "^0.13.5"
+  }
+}
