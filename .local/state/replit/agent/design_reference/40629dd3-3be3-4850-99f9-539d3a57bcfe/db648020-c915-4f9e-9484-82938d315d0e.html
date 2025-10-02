@@ -1,0 +1,729 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoulSync Connect - AI Companion Communication Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                borderRadius: {
+                    lg: "var(--radius)",
+                    md: "calc(var(--radius) - 2px)",
+                    sm: "calc(var(--radius) - 4px)",
+                },
+                colors: {
+                    background: "var(--background)",
+                    foreground: "var(--foreground)",
+                    card: {
+                        DEFAULT: "var(--card)",
+                        foreground: "var(--card-foreground)",
+                    },
+                    popover: {
+                        DEFAULT: "var(--popover)",
+                        foreground: "var(--popover-foreground)",
+                    },
+                    primary: {
+                        DEFAULT: "var(--primary)",
+                        foreground: "var(--primary-foreground)",
+                    },
+                    secondary: {
+                        DEFAULT: "var(--secondary)",
+                        foreground: "var(--secondary-foreground)",
+                    },
+                    muted: {
+                        DEFAULT: "var(--muted)",
+                        foreground: "var(--muted-foreground)",
+                    },
+                    accent: {
+                        DEFAULT: "var(--accent)",
+                        foreground: "var(--accent-foreground)",
+                    },
+                    destructive: {
+                        DEFAULT: "var(--destructive)",
+                        foreground: "var(--destructive-foreground)",
+                    },
+                    border: "var(--border)",
+                    input: "var(--input)",
+                    ring: "var(--ring)",
+                    chart: {
+                        "1": "var(--chart-1)",
+                        "2": "var(--chart-2)",
+                        "3": "var(--chart-3)",
+                        "4": "var(--chart-4)",
+                        "5": "var(--chart-5)",
+                    }
+                },
+                fontFamily: {
+                    sans: ["var(--font-sans)"],
+                    mono: ["var(--font-mono)"],
+                }
+            },
+        }
+    };
+    </script>
+    <style>
+    :root {
+        --background: hsl(222 84% 5%);
+        --foreground: hsl(210 40% 98%);
+        --card: hsl(222 84% 9%);
+        --card-foreground: hsl(210 40% 98%);
+        --popover: hsl(222 84% 9%);
+        --popover-foreground: hsl(210 40% 98%);
+        --primary: hsl(246 83% 67%);
+        --primary-foreground: hsl(210 40% 98%);
+        --secondary: hsl(217 32% 17%);
+        --secondary-foreground: hsl(210 40% 98%);
+        --muted: hsl(217 32% 17%);
+        --muted-foreground: hsl(215 20% 65%);
+        --accent: hsl(262 83% 58%);
+        --accent-foreground: hsl(210 40% 98%);
+        --destructive: hsl(0 62% 30%);
+        --destructive-foreground: hsl(210 40% 98%);
+        --border: hsl(217 32% 17%);
+        --input: hsl(217 32% 17%);
+        --ring: hsl(246 83% 67%);
+        --radius: 0.5rem;
+        --chart-1: hsl(12 76% 61%);
+        --chart-2: hsl(173 58% 39%);
+        --chart-3: hsl(197 37% 24%);
+        --chart-4: hsl(43 74% 66%);
+        --chart-5: hsl(27 87% 67%);
+        --font-sans: 'Inter', system-ui, sans-serif;
+        --font-mono: 'JetBrains Mono', monospace;
+    }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-background text-foreground font-sans antialiased min-h-screen">
+    <!-- @COMPONENT: MainLayout -->
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Left Sidebar Navigation -->
+        <!-- @COMPONENT: SidebarNavigation -->
+        <div class="w-72 bg-card border-r border-border flex flex-col">
+            <!-- Header -->
+            <div class="p-6 border-b border-border">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
+                        <i class="fas fa-brain text-primary-foreground text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-foreground">SoulSync Connect</h1>
+                        <p class="text-sm text-muted-foreground">AI Companion Platform</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <button data-event="click:switchTab" data-implementation="Switch to dashboard tab" 
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-primary text-primary-foreground font-medium">
+                    <i class="fas fa-home w-5 h-5"></i>
+                    <span>Dashboard</span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to call interface tab" 
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <i class="fas fa-phone w-5 h-5"></i>
+                    <span>Call Interface</span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to companions tab" 
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <i class="fas fa-robot w-5 h-5"></i>
+                    <span>Companions</span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to spotify tab" 
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <i class="fab fa-spotify w-5 h-5"></i>
+                    <span>Spotify Integration</span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to file sharing tab" 
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <i class="fas fa-folder-open w-5 h-5"></i>
+                    <span>File Sharing</span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to SMS management tab" 
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <i class="fas fa-comment-sms w-5 h-5"></i>
+                    <span>SMS Management</span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to API credentials tab" 
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <i class="fas fa-key w-5 h-5"></i>
+                    <span>API Credentials</span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to diagnostics tab" 
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <i class="fas fa-chart-line w-5 h-5"></i>
+                    <span>Diagnostics</span>
+                    <span class="ml-auto w-2 h-2 bg-chart-1 rounded-full animate-pulse"></span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to setup guide tab" 
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <i class="fas fa-book w-5 h-5"></i>
+                    <span>Setup Guide</span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to legal tab" 
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    <i class="fas fa-shield-alt w-5 h-5"></i>
+                    <span>Legal & ToS</span>
+                </button>
+            </nav>
+
+            <!-- Current Connection Status -->
+            <div class="p-4 border-t border-border">
+                <div class="bg-muted rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-sm font-medium text-foreground">System Status</span>
+                        <!-- @STATE: systemHealth:string = 'optimal' -->
+                        <div class="flex items-center space-x-2">
+                            <div class="w-2 h-2 bg-chart-2 rounded-full animate-pulse" data-bind="systemHealth.indicator"></div>
+                            <span class="text-xs text-muted-foreground" data-bind="systemHealth.text">Optimal</span>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-2 text-xs text-muted-foreground">
+                        <div class="flex justify-between">
+                            <span>Kindroid API:</span>
+                            <span class="text-chart-2" data-bind="kindroidStatus">Connected</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>ElevenLabs:</span>
+                            <span class="text-chart-2" data-bind="elevenLabsStatus">Connected</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Twilio:</span>
+                            <span class="text-chart-2" data-bind="twilioStatus">Connected</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Database:</span>
+                            <span class="text-chart-2" data-bind="databaseStatus">Healthy</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: SidebarNavigation -->
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            
+            <!-- Top Header Bar -->
+            <!-- @COMPONENT: TopHeaderBar -->
+            <header class="bg-card border-b border-border px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <h2 class="text-2xl font-bold text-foreground">Dashboard</h2>
+                        <div class="flex items-center space-x-2 px-3 py-1 bg-muted rounded-full">
+                            <div class="w-2 h-2 bg-chart-2 rounded-full animate-pulse"></div>
+                            <span class="text-sm text-muted-foreground">All systems operational</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4">
+                        <!-- Real-time Clock -->
+                        <div class="text-sm text-muted-foreground" data-bind="currentTime">
+                            <i class="fas fa-clock mr-2"></i>
+                            <span>12:34:56 PM</span>
+                        </div>
+                        
+                        <!-- Notification Bell -->
+                        <button class="relative p-2 text-muted-foreground hover:text-foreground transition-colors" 
+                                data-event="click:showNotifications">
+                            <i class="fas fa-bell text-lg"></i>
+                            <span class="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full text-xs"></span>
+                        </button>
+                        
+                        <!-- Settings -->
+                        <button class="p-2 text-muted-foreground hover:text-foreground transition-colors" 
+                                data-event="click:openSettings">
+                            <i class="fas fa-cog text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+            <!-- @END_COMPONENT: TopHeaderBar -->
+
+            <!-- Dashboard Content -->
+            <!-- @COMPONENT: DashboardContent -->
+            <main class="flex-1 p-6 overflow-y-auto">
+                <div class="max-w-7xl mx-auto space-y-6">
+                    
+                    <!-- Quick Actions Row -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <button data-event="click:quickCall" data-implementation="Initiate call with active companion" 
+                                class="bg-gradient-to-br from-chart-2 to-chart-3 text-white p-6 rounded-xl hover:scale-105 transition-transform">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-phone text-2xl"></i>
+                                <div class="text-left">
+                                    <h3 class="font-semibold">Quick Call</h3>
+                                    <p class="text-sm opacity-90">Start conversation</p>
+                                </div>
+                            </div>
+                        </button>
+                        
+                        <button data-event="click:addCompanion" data-implementation="Open add companion modal" 
+                                class="bg-gradient-to-br from-primary to-accent text-white p-6 rounded-xl hover:scale-105 transition-transform">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-plus text-2xl"></i>
+                                <div class="text-left">
+                                    <h3 class="font-semibold">Add Companion</h3>
+                                    <p class="text-sm opacity-90">Create new AI</p>
+                                </div>
+                            </div>
+                        </button>
+                        
+                        <button data-event="click:shareFile" data-implementation="Open file sharing interface" 
+                                class="bg-gradient-to-br from-chart-4 to-chart-5 text-white p-6 rounded-xl hover:scale-105 transition-transform">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-share text-2xl"></i>
+                                <div class="text-left">
+                                    <h3 class="font-semibold">Share File</h3>
+                                    <p class="text-sm opacity-90">Upload & send</p>
+                                </div>
+                            </div>
+                        </button>
+                        
+                        <button data-event="click:viewDiagnostics" data-implementation="Switch to diagnostics tab" 
+                                class="bg-gradient-to-br from-destructive to-chart-1 text-white p-6 rounded-xl hover:scale-105 transition-transform">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-chart-bar text-2xl"></i>
+                                <div class="text-left">
+                                    <h3 class="font-semibold">Diagnostics</h3>
+                                    <p class="text-sm opacity-90">System health</p>
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+
+                    <!-- Main Content Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        
+                        <!-- Left Column - Active Companion & Call Interface -->
+                        <div class="lg:col-span-2 space-y-6">
+                            
+                            <!-- Active Companion Card -->
+                            <div class="bg-card rounded-xl border border-border p-6">
+                                <div class="flex items-center justify-between mb-6">
+                                    <h3 class="text-lg font-semibold text-foreground">Active Companion</h3>
+                                    <button data-event="click:switchCompanion" data-implementation="Open companion selector" 
+                                            class="text-primary hover:text-primary/80 text-sm font-medium">
+                                        Switch Companion
+                                    </button>
+                                </div>
+                                
+                                <div class="flex items-center space-x-6">
+                                    <!-- Companion Avatar -->
+                                    <div class="relative">
+                                        <!-- AI companion with digital aura effect -->
+                                        <div class="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-accent p-1">
+                                            <div class="w-full h-full rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center">
+                                                <i class="fas fa-robot text-white text-2xl"></i>
+                                            </div>
+                                        </div>
+                                        <!-- Status indicator -->
+                                        <div class="absolute -bottom-1 -right-1 w-6 h-6 bg-chart-2 rounded-full border-2 border-card flex items-center justify-center">
+                                            <i class="fas fa-check text-xs text-white"></i>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex-1">
+                                        <h4 class="text-xl font-semibold text-foreground mb-1" data-bind="activeCompanion.name">Luna</h4>
+                                        <p class="text-muted-foreground mb-2" data-bind="activeCompanion.description">Creative AI Assistant & Companion</p>
+                                        
+                                        <div class="flex items-center space-x-4 text-sm">
+                                            <div class="flex items-center space-x-2">
+                                                <i class="fas fa-microphone text-accent"></i>
+                                                <span data-bind="activeCompanion.voice">Sophia (ElevenLabs)</span>
+                                            </div>
+                                            <div class="flex items-center space-x-2">
+                                                <i class="fas fa-clock text-chart-4"></i>
+                                                <span data-bind="lastInteraction">2 hours ago</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Call Controls -->
+                                <div class="mt-6 flex items-center justify-center space-x-4">
+                                    <!-- @STATE: isCallActive:boolean = false -->
+                                    <button data-event="click:startCall" data-implementation="Initiate Twilio call to companion" 
+                                            class="bg-chart-2 hover:bg-chart-2/80 text-white px-8 py-3 rounded-lg font-medium flex items-center space-x-2 transition-colors">
+                                        <i class="fas fa-phone"></i>
+                                        <span>Start Call</span>
+                                    </button>
+                                    
+                                    <button data-event="click:testVoice" data-implementation="Test ElevenLabs voice synthesis" 
+                                            class="bg-muted hover:bg-muted/80 text-foreground px-6 py-3 rounded-lg font-medium flex items-center space-x-2 transition-colors">
+                                        <i class="fas fa-volume-up"></i>
+                                        <span>Test Voice</span>
+                                    </button>
+                                    
+                                    <button data-event="click:sendMessage" data-implementation="Send text message to companion" 
+                                            class="bg-muted hover:bg-muted/80 text-foreground px-6 py-3 rounded-lg font-medium flex items-center space-x-2 transition-colors">
+                                        <i class="fas fa-comment"></i>
+                                        <span>Message</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Recent Activity -->
+                            <div class="bg-card rounded-xl border border-border p-6">
+                                <h3 class="text-lg font-semibold text-foreground mb-4">Recent Activity</h3>
+                                
+                                <div class="space-y-4">
+                                    <!-- @MAP: recentActivities.map(activity => ( -->
+                                    <div class="flex items-center space-x-4 p-4 bg-muted rounded-lg" data-mock="true">
+                                        <div class="w-10 h-10 bg-chart-2 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-phone text-white text-sm"></i>
+                                        </div>
+                                        <div class="flex-1">
+                                            <p class="text-foreground font-medium">Call with Luna completed</p>
+                                            <p class="text-sm text-muted-foreground">Duration: 15:32 • Quality: HD • No errors</p>
+                                        </div>
+                                        <span class="text-sm text-muted-foreground">2 hours ago</span>
+                                    </div>
+                                    
+                                    <div class="flex items-center space-x-4 p-4 bg-muted rounded-lg" data-mock="true">
+                                        <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                                            <i class="fas fa-file text-white text-sm"></i>
+                                        </div>
+                                        <div class="flex-1">
+                                            <p class="text-foreground font-medium">Shared document with Alex</p>
+                                            <p class="text-sm text-muted-foreground">presentation.pdf • 2.4 MB</p>
+                                        </div>
+                                        <span class="text-sm text-muted-foreground">5 hours ago</span>
+                                    </div>
+                                    
+                                    <div class="flex items-center space-x-4 p-4 bg-muted rounded-lg" data-mock="true">
+                                        <div class="w-10 h-10 bg-chart-4 rounded-full flex items-center justify-center">
+                                            <i class="fab fa-spotify text-white text-sm"></i>
+                                        </div>
+                                        <div class="flex-1">
+                                            <p class="text-foreground font-medium">Music session with Luna</p>
+                                            <p class="text-sm text-muted-foreground">Listened to "Chill Vibes" playlist</p>
+                                        </div>
+                                        <span class="text-sm text-muted-foreground">1 day ago</span>
+                                    </div>
+                                    <!-- @END_MAP )) -->
+                                </div>
+                                
+                                <button class="w-full mt-4 text-primary hover:text-primary/80 text-sm font-medium" 
+                                        data-event="click:viewAllActivity">
+                                    View All Activity
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Right Column - System Info & Quick Stats -->
+                        <div class="space-y-6">
+                            
+                            <!-- System Performance -->
+                            <div class="bg-card rounded-xl border border-border p-6">
+                                <h3 class="text-lg font-semibold text-foreground mb-4">System Performance</h3>
+                                
+                                <div class="space-y-4">
+                                    <!-- API Response Times -->
+                                    <div>
+                                        <div class="flex justify-between text-sm mb-2">
+                                            <span class="text-muted-foreground">Kindroid API</span>
+                                            <span class="text-chart-2 font-medium" data-bind="kindroidLatency">142ms</span>
+                                        </div>
+                                        <div class="w-full bg-muted rounded-full h-2">
+                                            <div class="bg-chart-2 h-2 rounded-full" style="width: 85%"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <div class="flex justify-between text-sm mb-2">
+                                            <span class="text-muted-foreground">ElevenLabs</span>
+                                            <span class="text-chart-2 font-medium" data-bind="elevenLabsLatency">89ms</span>
+                                        </div>
+                                        <div class="w-full bg-muted rounded-full h-2">
+                                            <div class="bg-chart-2 h-2 rounded-full" style="width: 95%"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <div class="flex justify-between text-sm mb-2">
+                                            <span class="text-muted-foreground">Twilio Voice</span>
+                                            <span class="text-chart-2 font-medium" data-bind="twilioLatency">56ms</span>
+                                        </div>
+                                        <div class="w-full bg-muted rounded-full h-2">
+                                            <div class="bg-chart-2 h-2 rounded-full" style="width: 98%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-6 p-4 bg-muted rounded-lg">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-medium text-foreground">Overall Health</span>
+                                        <span class="text-chart-2 font-bold" data-bind="overallHealth">Excellent</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- API Usage Stats -->
+                            <div class="bg-card rounded-xl border border-border p-6">
+                                <h3 class="text-lg font-semibold text-foreground mb-4">API Usage Today</h3>
+                                
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <i class="fas fa-robot text-primary"></i>
+                                            <span class="text-foreground">Kindroid Calls</span>
+                                        </div>
+                                        <span class="font-semibold text-foreground" data-bind="kindroidCalls">24</span>
+                                    </div>
+                                    
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <i class="fas fa-microphone text-accent"></i>
+                                            <span class="text-foreground">Voice Synthesis</span>
+                                        </div>
+                                        <span class="font-semibold text-foreground" data-bind="voiceSynthesis">87</span>
+                                    </div>
+                                    
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <i class="fas fa-phone text-chart-2"></i>
+                                            <span class="text-foreground">Twilio Minutes</span>
+                                        </div>
+                                        <span class="font-semibold text-foreground" data-bind="twilioMinutes">156</span>
+                                    </div>
+                                    
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <i class="fas fa-database text-chart-4"></i>
+                                            <span class="text-foreground">DB Queries</span>
+                                        </div>
+                                        <span class="font-semibold text-foreground" data-bind="dbQueries">1,247</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Error Log Summary -->
+                            <div class="bg-card rounded-xl border border-border p-6">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="text-lg font-semibold text-foreground">Error Summary</h3>
+                                    <button data-event="click:viewErrorLog" data-implementation="Switch to diagnostics error log" 
+                                            class="text-primary hover:text-primary/80 text-sm font-medium">
+                                        View All
+                                    </button>
+                                </div>
+                                
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between p-3 bg-muted rounded-lg">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-3 h-3 bg-chart-2 rounded-full"></div>
+                                            <span class="text-sm text-foreground">No critical errors</span>
+                                        </div>
+                                        <span class="text-xs text-muted-foreground">24h</span>
+                                    </div>
+                                    
+                                    <div class="flex items-center justify-between p-3 bg-muted rounded-lg">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-3 h-3 bg-chart-4 rounded-full"></div>
+                                            <span class="text-sm text-foreground">2 warnings</span>
+                                        </div>
+                                        <span class="text-xs text-muted-foreground">2h ago</span>
+                                    </div>
+                                    
+                                    <div class="flex items-center justify-between p-3 bg-muted rounded-lg">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-3 h-3 bg-muted-foreground rounded-full"></div>
+                                            <span class="text-sm text-foreground">15 info logs</span>
+                                        </div>
+                                        <span class="text-xs text-muted-foreground">1m ago</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Quick Configuration -->
+                            <div class="bg-card rounded-xl border border-border p-6">
+                                <h3 class="text-lg font-semibold text-foreground mb-4">Quick Settings</h3>
+                                
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-foreground">Auto-reconnect</span>
+                                        <button class="w-12 h-6 bg-primary rounded-full relative transition-colors" 
+                                                data-event="click:toggleAutoReconnect">
+                                            <div class="w-4 h-4 bg-white rounded-full absolute top-1 right-1 transition-transform"></div>
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-foreground">Error notifications</span>
+                                        <button class="w-12 h-6 bg-primary rounded-full relative transition-colors" 
+                                                data-event="click:toggleErrorNotifications">
+                                            <div class="w-4 h-4 bg-white rounded-full absolute top-1 right-1 transition-transform"></div>
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-foreground">Debug mode</span>
+                                        <button class="w-12 h-6 bg-muted rounded-full relative transition-colors" 
+                                                data-event="click:toggleDebugMode">
+                                            <div class="w-4 h-4 bg-white rounded-full absolute top-1 left-1 transition-transform"></div>
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="pt-4 border-t border-border">
+                                        <button data-event="click:exportLogs" data-implementation="Export diagnostics data" 
+                                                class="w-full bg-muted hover:bg-muted/80 text-foreground py-2 rounded-lg text-sm font-medium transition-colors">
+                                            Export Diagnostics
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Connection Diagnostics Visual -->
+                    <div class="bg-card rounded-xl border border-border p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-lg font-semibold text-foreground">Real-time Connection Map</h3>
+                            <div class="flex items-center space-x-4">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-chart-2 rounded-full animate-pulse"></div>
+                                    <span class="text-sm text-muted-foreground">Live</span>
+                                </div>
+                                <button data-event="click:refreshConnections" data-implementation="Refresh all API connections" 
+                                        class="text-primary hover:text-primary/80 text-sm font-medium">
+                                    <i class="fas fa-sync-alt mr-1"></i>Refresh
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Visual connection diagram -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <!-- SoulSync Center -->
+                            <div class="md:col-span-4 flex justify-center mb-8">
+                                <div class="relative">
+                                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center">
+                                        <i class="fas fa-brain text-white text-xl"></i>
+                                    </div>
+                                    <div class="absolute -top-2 -left-2 w-20 h-20 border-2 border-primary rounded-full animate-ping opacity-20"></div>
+                                    <p class="text-center mt-2 text-sm font-medium text-foreground">SoulSync Core</p>
+                                </div>
+                            </div>
+                            
+                            <!-- API Connections -->
+                            <div class="text-center">
+                                <div class="w-12 h-12 bg-chart-2 rounded-full flex items-center justify-center mx-auto mb-2">
+                                    <i class="fas fa-robot text-white"></i>
+                                </div>
+                                <p class="text-sm font-medium text-foreground">Kindroid</p>
+                                <p class="text-xs text-chart-2">142ms</p>
+                            </div>
+                            
+                            <div class="text-center">
+                                <div class="w-12 h-12 bg-accent rounded-full flex items-center justify-center mx-auto mb-2">
+                                    <i class="fas fa-microphone text-white"></i>
+                                </div>
+                                <p class="text-sm font-medium text-foreground">ElevenLabs</p>
+                                <p class="text-xs text-chart-2">89ms</p>
+                            </div>
+                            
+                            <div class="text-center">
+                                <div class="w-12 h-12 bg-chart-3 rounded-full flex items-center justify-center mx-auto mb-2">
+                                    <i class="fas fa-phone text-white"></i>
+                                </div>
+                                <p class="text-sm font-medium text-foreground">Twilio</p>
+                                <p class="text-xs text-chart-2">56ms</p>
+                            </div>
+                            
+                            <div class="text-center">
+                                <div class="w-12 h-12 bg-chart-4 rounded-full flex items-center justify-center mx-auto mb-2">
+                                    <i class="fab fa-spotify text-white"></i>
+                                </div>
+                                <p class="text-sm font-medium text-foreground">Spotify</p>
+                                <p class="text-xs text-chart-2">234ms</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+            <!-- @END_COMPONENT: DashboardContent -->
+        </div>
+    </div>
+    <!-- @END_COMPONENT: MainLayout -->
+
+    <!-- Floating Action Button -->
+    <button data-event="click:emergencyStop" data-implementation="Emergency stop all operations" 
+            class="fixed bottom-6 right-6 w-14 h-14 bg-destructive hover:bg-destructive/80 text-destructive-foreground rounded-full shadow-lg flex items-center justify-center transition-colors z-50">
+        <i class="fas fa-stop text-xl"></i>
+    </button>
+
+    <!-- WebSocket Connection Indicator -->
+    <div class="fixed bottom-6 left-6 flex items-center space-x-2 bg-card border border-border rounded-lg px-3 py-2 shadow-lg">
+        <!-- @STATE: websocketStatus:string = 'connected' -->
+        <div class="w-2 h-2 bg-chart-2 rounded-full animate-pulse" data-bind="websocketStatus.indicator"></div>
+        <span class="text-sm text-muted-foreground" data-bind="websocketStatus.text">WebSocket Connected</span>
+    </div>
+
+    <script>
+    (function() {
+        // TODO: Implement WebSocket connection for real-time updates
+        // TODO: Implement tab switching functionality
+        // TODO: Implement API status monitoring
+        // TODO: Implement real-time performance metrics
+        // TODO: Implement error logging and notification system
+        // TODO: Implement companion management
+        // TODO: Implement call control functionality
+        // TODO: Implement file sharing interface
+        // TODO: Implement Spotify integration
+        // TODO: Implement SMS management
+        // TODO: Implement encrypted API credential storage
+        // TODO: Implement comprehensive diagnostics dashboard
+        // TODO: Implement Twilio webhook handling
+        // TODO: Implement PostgreSQL database integration
+        // TODO: Implement AES-256 encryption for sensitive data
+        
+        // Real-time clock update
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            const clockElement = document.querySelector('[data-bind="currentTime"] span');
+            if (clockElement) {
+                clockElement.textContent = timeString;
+            }
+        }
+        
+        // Update clock every second
+        setInterval(updateClock, 1000);
+        updateClock(); // Initial update
+        
+        // Simulate real-time data updates
+        function simulateRealtimeUpdates() {
+            // This would be replaced with actual WebSocket data
+            const metrics = ['kindroidLatency', 'elevenLabsLatency', 'twilioLatency'];
+            metrics.forEach(metric => {
+                const element = document.querySelector(`[data-bind="${metric}"]`);
+                if (element) {
+                    const baseValue = parseInt(element.textContent);
+                    const variation = Math.floor(Math.random() * 20) - 10;
+                    element.textContent = Math.max(10, baseValue + variation) + 'ms';
+                }
+            });
+        }
+        
+        // Update metrics every 5 seconds
+        setInterval(simulateRealtimeUpdates, 5000);
+    })();
+    </script>
+</body>
+</html>

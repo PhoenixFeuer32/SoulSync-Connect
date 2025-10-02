@@ -1,0 +1,625 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kindroid Companion Calling App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'inter': ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary': '#6366F1',
+                        'companion': '#8B5CF6',
+                        'slate-850': '#1a202c',
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="font-inter bg-slate-900 text-slate-50 min-h-screen">
+
+<!-- @COMPONENT: MainLayout [full application container] -->
+<div class="flex h-screen overflow-hidden">
+    
+    <!-- @COMPONENT: Sidebar [companion and voice controls] -->
+    <div class="w-80 bg-slate-800 border-r border-slate-700 flex flex-col">
+        <!-- Header -->
+        <div class="p-6 border-b border-slate-700">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-primary to-companion rounded-lg flex items-center justify-center">
+                    <i class="fas fa-robot text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-semibold">Kindroid Call</h1>
+                    <p class="text-slate-400 text-sm">Companion Calling</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Companion Card -->
+        <div class="p-6 border-b border-slate-700">
+            <h2 class="text-sm font-medium text-slate-300 mb-4">Active Companion</h2>
+            <div class="bg-slate-850 rounded-xl p-4 border border-slate-600">
+                <!-- A warm, friendly AI companion avatar with soft lighting -->
+                <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=120&h=120" 
+                     alt="Active companion avatar" 
+                     class="w-16 h-16 rounded-full mx-auto mb-3 border-2 border-companion" 
+                     data-mock="true" />
+                <h3 class="text-center font-medium" data-bind="companion.name">Luna</h3>
+                <p class="text-center text-sm text-slate-400" data-bind="companion.personality">Caring & Thoughtful</p>
+                <div class="flex items-center justify-center mt-2">
+                    <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                    <span class="text-xs text-green-400">Available</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Companion Management -->
+        <div class="p-6 border-b border-slate-700">
+            <h2 class="text-sm font-medium text-slate-300 mb-4">Companion Settings</h2>
+            
+            <!-- Change Companion -->
+            <div class="mb-4">
+                <label class="block text-sm text-slate-400 mb-2">Bot ID</label>
+                <div class="flex space-x-2">
+                    <input type="text" 
+                           placeholder="Enter Kindroid Bot ID" 
+                           class="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                           data-bind="botId"
+                           data-mock="true" />
+                    <button class="bg-companion hover:bg-purple-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            data-event="click:changeCompanion">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Change Voice -->
+            <div>
+                <label class="block text-sm text-slate-400 mb-2">Voice ID</label>
+                <div class="flex space-x-2">
+                    <input type="text" 
+                           placeholder="Enter ElevenLabs Voice ID" 
+                           class="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                           data-bind="voiceId"
+                           data-mock="true" />
+                    <button class="bg-primary hover:bg-indigo-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            data-event="click:changeVoice">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="p-6 flex-1">
+            <h2 class="text-sm font-medium text-slate-300 mb-4">Quick Actions</h2>
+            <div class="space-y-3">
+                <button class="w-full bg-slate-700 hover:bg-slate-600 p-3 rounded-lg text-left transition-colors"
+                        data-event="click:openFileShare">
+                    <i class="fas fa-file-upload text-blue-400 mr-3"></i>
+                    <span class="text-sm">Share Files</span>
+                </button>
+                <button class="w-full bg-slate-700 hover:bg-slate-600 p-3 rounded-lg text-left transition-colors"
+                        data-event="click:openSpotify">
+                    <i class="fab fa-spotify text-green-400 mr-3"></i>
+                    <span class="text-sm">Spotify Integration</span>
+                </button>
+                <button class="w-full bg-slate-700 hover:bg-slate-600 p-3 rounded-lg text-left transition-colors"
+                        data-event="click:openDiagnostics">
+                    <i class="fas fa-chart-line text-amber-400 mr-3"></i>
+                    <span class="text-sm">Diagnostics</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: Sidebar -->
+
+    <!-- @COMPONENT: MainContent [calling interface and controls] -->
+    <div class="flex-1 flex flex-col bg-slate-900">
+        
+        <!-- @COMPONENT: CallInterface [main calling area] -->
+        <div class="flex-1 flex flex-col items-center justify-center p-8">
+            
+            <!-- Call Status Display -->
+            <div class="text-center mb-8">
+                <!-- @STATE: callStatus:string = 'idle' | 'calling' | 'connected' | 'ended' -->
+                <div class="w-48 h-48 mx-auto mb-6 relative">
+                    <!-- A serene video call background with soft bokeh lighting -->
+                    <div class="w-full h-full bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 rounded-full flex items-center justify-center border-4 border-slate-600 relative overflow-hidden">
+                        <div class="absolute inset-0 bg-gradient-to-br from-primary/20 to-companion/20 rounded-full animate-pulse" data-show-when="calling"></div>
+                        <!-- Companion avatar for active call -->
+                        <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=180&h=180" 
+                             alt="Companion during call" 
+                             class="w-32 h-32 rounded-full object-cover" 
+                             data-mock="true" />
+                        
+                        <!-- Call status indicator -->
+                        <div class="absolute -bottom-2 -right-2 w-12 h-12 bg-green-500 rounded-full flex items-center justify-center border-4 border-slate-900" data-show-when="connected">
+                            <i class="fas fa-phone text-white text-sm"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <h2 class="text-2xl font-semibold mb-2" data-bind="callStatus.title">Ready to Call</h2>
+                <p class="text-slate-400" data-bind="callStatus.subtitle">Press the call button to connect with Luna</p>
+                
+                <!-- Call Duration -->
+                <div class="mt-4" data-show-when="connected">
+                    <div class="inline-flex items-center bg-slate-800 rounded-full px-4 py-2">
+                        <div class="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
+                        <span class="text-sm font-mono" data-bind="callDuration">00:02:45</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audio Visualizer -->
+            <div class="w-full max-w-md mb-8" data-show-when="connected">
+                <div class="bg-slate-800 rounded-xl p-6">
+                    <div class="flex items-center justify-center space-x-1 h-16">
+                        <!-- @FUNCTIONALITY: Real-time audio waveform visualization using Web Audio API -->
+                        <div class="w-1 bg-primary rounded-full animate-pulse" style="height: 20px;"></div>
+                        <div class="w-1 bg-primary rounded-full animate-pulse" style="height: 35px; animation-delay: 0.1s;"></div>
+                        <div class="w-1 bg-companion rounded-full animate-pulse" style="height: 25px; animation-delay: 0.2s;"></div>
+                        <div class="w-1 bg-primary rounded-full animate-pulse" style="height: 45px; animation-delay: 0.3s;"></div>
+                        <div class="w-1 bg-companion rounded-full animate-pulse" style="height: 30px; animation-delay: 0.4s;"></div>
+                        <div class="w-1 bg-primary rounded-full animate-pulse" style="height: 40px; animation-delay: 0.5s;"></div>
+                        <div class="w-1 bg-companion rounded-full animate-pulse" style="height: 25px; animation-delay: 0.6s;"></div>
+                        <div class="w-1 bg-primary rounded-full animate-pulse" style="height: 35px; animation-delay: 0.7s;"></div>
+                    </div>
+                    <p class="text-center text-xs text-slate-400 mt-2">Real-time audio processing</p>
+                </div>
+            </div>
+
+            <!-- Call Controls -->
+            <div class="flex items-center space-x-6">
+                
+                <!-- Mute Button -->
+                <button class="w-14 h-14 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center transition-colors"
+                        data-event="click:toggleMute"
+                        data-show-when="connected">
+                    <i class="fas fa-microphone text-lg" data-state="unmuted"></i>
+                    <i class="fas fa-microphone-slash text-lg text-red-400 hidden" data-state="muted"></i>
+                </button>
+
+                <!-- Main Call Button -->
+                <button class="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-semibold transition-all transform hover:scale-105"
+                        data-event="click:toggleCall"
+                        data-implementation="Should handle call initiation/termination with Twilio">
+                    <!-- Call Button (Idle State) -->
+                    <div class="w-full h-full bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center shadow-lg" data-state="idle">
+                        <i class="fas fa-phone"></i>
+                    </div>
+                    <!-- End Call Button (Connected State) -->
+                    <div class="w-full h-full bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-lg hidden" data-state="connected">
+                        <i class="fas fa-phone-slash"></i>
+                    </div>
+                    <!-- Calling State -->
+                    <div class="w-full h-full bg-gradient-to-br from-amber-500 to-amber-600 rounded-full flex items-center justify-center shadow-lg hidden animate-pulse" data-state="calling">
+                        <i class="fas fa-spinner animate-spin"></i>
+                    </div>
+                </button>
+
+                <!-- Speaker Button -->
+                <button class="w-14 h-14 bg-slate-700 hover:bg-slate-600 rounded-full flex items-center justify-center transition-colors"
+                        data-event="click:toggleSpeaker"
+                        data-show-when="connected">
+                    <i class="fas fa-volume-up text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Connection Quality Indicator -->
+            <div class="mt-6 flex items-center space-x-2" data-show-when="connected">
+                <div class="flex space-x-1">
+                    <div class="w-1 h-3 bg-green-400 rounded-full"></div>
+                    <div class="w-1 h-3 bg-green-400 rounded-full"></div>
+                    <div class="w-1 h-3 bg-green-400 rounded-full"></div>
+                    <div class="w-1 h-3 bg-slate-600 rounded-full"></div>
+                    <div class="w-1 h-3 bg-slate-600 rounded-full"></div>
+                </div>
+                <span class="text-xs text-slate-400">Good connection</span>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: CallInterface -->
+
+        <!-- @COMPONENT: StatusBar [real-time API status] -->
+        <div class="bg-slate-800 border-t border-slate-700 p-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-6">
+                    <!-- API Status Indicators -->
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <span class="text-xs text-slate-300">Kindroid STT</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <span class="text-xs text-slate-300">ElevenLabs TTS</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <span class="text-xs text-slate-300">Twilio</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4 text-xs text-slate-400">
+                    <span>Latency: <span class="text-green-400" data-bind="latency">45ms</span></span>
+                    <span>Quality: <span class="text-green-400" data-bind="quality">HD</span></span>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: StatusBar -->
+    </div>
+    <!-- @END_COMPONENT: MainContent -->
+</div>
+<!-- @END_COMPONENT: MainLayout -->
+
+<!-- @COMPONENT: FileShareModal [file sharing interface] -->
+<div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden" id="fileShareModal" data-modal="fileShare">
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-2xl w-full max-w-lg border border-slate-700">
+            <div class="p-6 border-b border-slate-700">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold">Share Files with Luna</h3>
+                    <button class="text-slate-400 hover:text-white" data-event="click:closeModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <!-- File Drop Zone -->
+                <div class="border-2 border-dashed border-slate-600 rounded-xl p-8 text-center hover:border-primary transition-colors cursor-pointer"
+                     data-implementation="Should handle file uploads and sharing with companion">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-slate-400 mb-4"></i>
+                    <h4 class="text-lg font-medium mb-2">Drop files here or click to browse</h4>
+                    <p class="text-slate-400 text-sm">Share images, documents, or audio files</p>
+                    <input type="file" multiple class="hidden" data-mock-input="true" />
+                </div>
+
+                <!-- Recent Files -->
+                <div class="mt-6">
+                    <h5 class="text-sm font-medium text-slate-300 mb-3">Recent Shared Files</h5>
+                    <div class="space-y-2">
+                        <!-- @MAP: recentFiles.map(file => ( -->
+                        <div class="flex items-center justify-between bg-slate-700 rounded-lg p-3" data-mock="true">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-file-image text-blue-400"></i>
+                                <span class="text-sm">vacation_photo.jpg</span>
+                            </div>
+                            <span class="text-xs text-slate-400">2 min ago</span>
+                        </div>
+                        <!-- @END_MAP )) -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- @END_COMPONENT: FileShareModal -->
+
+<!-- @COMPONENT: SpotifyModal [Spotify integration interface] -->
+<div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden" id="spotifyModal" data-modal="spotify">
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700">
+            <div class="p-6 border-b border-slate-700">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold flex items-center">
+                        <i class="fab fa-spotify text-green-400 mr-2"></i>
+                        Spotify Integration
+                    </h3>
+                    <button class="text-slate-400 hover:text-white" data-event="click:closeModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <!-- Currently Playing -->
+                <div class="bg-slate-700 rounded-xl p-4 mb-4">
+                    <div class="flex items-center space-x-4">
+                        <!-- Album cover for currently playing song -->
+                        <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=80&h=80" 
+                             alt="Currently playing album cover" 
+                             class="w-12 h-12 rounded-lg" 
+                             data-mock="true" />
+                        <div class="flex-1">
+                            <h4 class="font-medium text-sm" data-bind="spotify.currentTrack">Chill Vibes Playlist</h4>
+                            <p class="text-slate-400 text-xs" data-bind="spotify.artist">Lo-Fi Beats</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Playback Controls -->
+                    <div class="flex items-center justify-center space-x-4 mt-4">
+                        <button class="text-slate-400 hover:text-white" data-event="click:previousTrack">
+                            <i class="fas fa-step-backward"></i>
+                        </button>
+                        <button class="w-10 h-10 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center text-white" data-event="click:togglePlayback">
+                            <i class="fas fa-pause" data-state="playing"></i>
+                            <i class="fas fa-play hidden" data-state="paused"></i>
+                        </button>
+                        <button class="text-slate-400 hover:text-white" data-event="click:nextTrack">
+                            <i class="fas fa-step-forward"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Share Music Feature -->
+                <div class="space-y-3">
+                    <button class="w-full bg-green-600 hover:bg-green-700 p-3 rounded-lg text-sm font-medium transition-colors"
+                            data-event="click:shareCurrentSong">
+                        <i class="fas fa-share mr-2"></i>
+                        Share Current Song with Luna
+                    </button>
+                    <button class="w-full bg-slate-700 hover:bg-slate-600 p-3 rounded-lg text-sm font-medium transition-colors"
+                            data-event="click:createSharedPlaylist">
+                        <i class="fas fa-list-music mr-2"></i>
+                        Create Shared Playlist
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- @END_COMPONENT: SpotifyModal -->
+
+<!-- @COMPONENT: DiagnosticsModal [comprehensive diagnostic dashboard] -->
+<div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden" id="diagnosticsModal" data-modal="diagnostics">
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-slate-700">
+            <div class="p-6 border-b border-slate-700">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold flex items-center">
+                        <i class="fas fa-chart-line text-amber-400 mr-2"></i>
+                        System Diagnostics
+                    </h3>
+                    <button class="text-slate-400 hover:text-white" data-event="click:closeModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                
+                <!-- API Status Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-slate-700 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-medium">Kindroid STT</h4>
+                            <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Response Time</span>
+                                <span class="text-green-400" data-bind="kindroid.responseTime">120ms</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Success Rate</span>
+                                <span class="text-green-400" data-bind="kindroid.successRate">98.5%</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Last Error</span>
+                                <span class="text-slate-400" data-bind="kindroid.lastError">None</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-700 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-medium">ElevenLabs TTS</h4>
+                            <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Response Time</span>
+                                <span class="text-green-400" data-bind="elevenlabs.responseTime">95ms</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Voice Quality</span>
+                                <span class="text-green-400" data-bind="elevenlabs.quality">High</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Characters Used</span>
+                                <span class="text-slate-400" data-bind="elevenlabs.usage">2.4k/10k</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-700 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-medium">Twilio</h4>
+                            <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Connection</span>
+                                <span class="text-green-400" data-bind="twilio.connection">Stable</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Call Quality</span>
+                                <span class="text-green-400" data-bind="twilio.quality">HD</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">Bandwidth</span>
+                                <span class="text-green-400" data-bind="twilio.bandwidth">128 kbps</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Logs -->
+                <div class="bg-slate-700 rounded-xl p-4 mb-6">
+                    <h4 class="font-medium mb-4">Recent Error Logs</h4>
+                    <div class="space-y-2 text-sm font-mono">
+                        <!-- @MAP: errorLogs.map(log => ( -->
+                        <div class="flex items-start space-x-3 p-2 bg-slate-800 rounded" data-mock="true">
+                            <span class="text-slate-400 shrink-0">14:32:15</span>
+                            <span class="text-amber-400 shrink-0">[WARN]</span>
+                            <span class="text-slate-300">Kindroid API response time exceeded 200ms threshold</span>
+                        </div>
+                        <!-- @END_MAP )) -->
+                        <div class="flex items-start space-x-3 p-2 bg-slate-800 rounded" data-mock="true">
+                            <span class="text-slate-400 shrink-0">14:28:42</span>
+                            <span class="text-green-400 shrink-0">[INFO]</span>
+                            <span class="text-slate-300">WebSocket connection established successfully</span>
+                        </div>
+                        <div class="flex items-start space-x-3 p-2 bg-slate-800 rounded" data-mock="true">
+                            <span class="text-slate-400 shrink-0">14:25:10</span>
+                            <span class="text-red-400 shrink-0">[ERROR]</span>
+                            <span class="text-slate-300">ElevenLabs API rate limit warning (retrying in 2s)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Metrics -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-slate-700 rounded-xl p-4">
+                        <h4 class="font-medium mb-4">Audio Pipeline Performance</h4>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>STT Processing</span>
+                                    <span data-bind="metrics.stt">85%</span>
+                                </div>
+                                <div class="w-full bg-slate-600 rounded-full h-2">
+                                    <div class="bg-green-400 h-2 rounded-full" style="width: 85%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>TTS Generation</span>
+                                    <span data-bind="metrics.tts">92%</span>
+                                </div>
+                                <div class="w-full bg-slate-600 rounded-full h-2">
+                                    <div class="bg-blue-400 h-2 rounded-full" style="width: 92%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>WebSocket Stability</span>
+                                    <span data-bind="metrics.websocket">98%</span>
+                                </div>
+                                <div class="w-full bg-slate-600 rounded-full h-2">
+                                    <div class="bg-green-400 h-2 rounded-full" style="width: 98%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-700 rounded-xl p-4">
+                        <h4 class="font-medium mb-4">System Resources</h4>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>CPU Usage</span>
+                                    <span data-bind="system.cpu">45%</span>
+                                </div>
+                                <div class="w-full bg-slate-600 rounded-full h-2">
+                                    <div class="bg-blue-400 h-2 rounded-full" style="width: 45%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>Memory Usage</span>
+                                    <span data-bind="system.memory">62%</span>
+                                </div>
+                                <div class="w-full bg-slate-600 rounded-full h-2">
+                                    <div class="bg-yellow-400 h-2 rounded-full" style="width: 62%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span>Network I/O</span>
+                                    <span data-bind="system.network">28%</span>
+                                </div>
+                                <div class="w-full bg-slate-600 rounded-full h-2">
+                                    <div class="bg-green-400 h-2 rounded-full" style="width: 28%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- @END_COMPONENT: DiagnosticsModal -->
+
+<script>
+// TODO: Implement business logic, API calls, and state management
+(function() {
+    'use strict';
+    
+    // Modal Management
+    const modals = {
+        fileShare: document.getElementById('fileShareModal'),
+        spotify: document.getElementById('spotifyModal'),
+        diagnostics: document.getElementById('diagnosticsModal')
+    };
+
+    // TODO: Implement Twilio SDK integration for calling functionality
+    // TODO: Implement Kindroid API for speech-to-text processing
+    // TODO: Implement ElevenLabs API for text-to-speech generation
+    // TODO: Implement WebSocket connections for real-time audio streaming
+    // TODO: Implement Spotify Web API integration
+    // TODO: Implement file upload and sharing functionality
+    
+    // Mock Event Handlers for Demo Purposes
+    document.addEventListener('click', function(e) {
+        const target = e.target.closest('[data-event]');
+        if (!target) return;
+        
+        const event = target.getAttribute('data-event');
+        
+        switch(event) {
+            case 'click:openFileShare':
+                modals.fileShare.classList.remove('hidden');
+                break;
+            case 'click:openSpotify':
+                modals.spotify.classList.remove('hidden');
+                break;
+            case 'click:openDiagnostics':
+                modals.diagnostics.classList.remove('hidden');
+                break;
+            case 'click:closeModal':
+                Object.values(modals).forEach(modal => modal.classList.add('hidden'));
+                break;
+            case 'click:toggleCall':
+                // TODO: Implement actual call logic with Twilio
+                console.log('Call toggle requested');
+                break;
+            case 'click:changeCompanion':
+                // TODO: Implement companion switching with Kindroid API
+                console.log('Companion change requested');
+                break;
+            case 'click:changeVoice':
+                // TODO: Implement voice switching with ElevenLabs API
+                console.log('Voice change requested');
+                break;
+        }
+    });
+
+    // Close modals when clicking outside
+    Object.values(modals).forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    });
+
+    // TODO: Initialize WebSocket connections for real-time audio
+    // TODO: Set up audio context for real-time processing
+    // TODO: Implement error handling and retry logic for all APIs
+    // TODO: Set up diagnostic monitoring and logging system
+})();
+</script>
+
+</body>
+</html>

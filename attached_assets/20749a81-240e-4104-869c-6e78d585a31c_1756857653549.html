@@ -1,0 +1,1805 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoulSyncConnect - Kindroid Companion Calling</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'roboto': ['Roboto', 'sans-serif'],
+                        'roboto-mono': ['Roboto Mono', 'monospace']
+                    },
+                    colors: {
+                        'primary': '#1976d2',
+                        'primary-dark': '#1565c0',
+                        'secondary': '#424242',
+                        'accent': '#00c853',
+                        'error': '#d32f2f',
+                        'warning': '#ff9800',
+                        'surface': '#ffffff'
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="bg-gray-50 font-roboto text-gray-900">
+    <!-- @COMPONENT: AppShell -->
+    <div class="flex h-screen">
+        <!-- Sidebar Navigation -->
+        <!-- @COMPONENT: Sidebar -->
+        <div class="w-72 bg-white shadow-lg border-r border-gray-200 flex flex-col">
+            <!-- Brand Header -->
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                        <i class="fas fa-phone text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900">SoulSyncConnect</h1>
+                        <p class="text-sm text-gray-500">Kindroid Companion Calls</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="flex-1 p-4 space-y-2">
+                <button data-section="dashboard" class="nav-item active w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-home w-5 text-center"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button data-section="calling" class="nav-item w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-phone w-5 text-center"></i>
+                    <span>Call Interface</span>
+                </button>
+                <button data-section="companions" class="nav-item w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-robot w-5 text-center"></i>
+                    <span>Companions</span>
+                </button>
+                <button data-section="spotify" class="nav-item w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors">
+                    <i class="fab fa-spotify w-5 text-center"></i>
+                    <span>Spotify Integration</span>
+                </button>
+                <button data-section="files" class="nav-item w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-file-upload w-5 text-center"></i>
+                    <span>File Sharing</span>
+                </button>
+                <button data-section="sms" class="nav-item w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-sms w-5 text-center"></i>
+                    <span>SMS Management</span>
+                </button>
+                <button data-section="credentials" class="nav-item w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-key w-5 text-center"></i>
+                    <span>API Credentials</span>
+                </button>
+                <button data-section="diagnostics" class="nav-item w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-chart-line w-5 text-center"></i>
+                    <span>Diagnostics</span>
+                </button>
+                <button data-section="setup" class="nav-item w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-cog w-5 text-center"></i>
+                    <span>Setup Guide</span>
+                </button>
+                <button data-section="legal" class="nav-item w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors">
+                    <i class="fas fa-gavel w-5 text-center"></i>
+                    <span>Legal & ToS</span>
+                </button>
+            </nav>
+
+            <!-- Connection Status -->
+            <div class="p-4 border-t border-gray-200">
+                <div class="flex items-center space-x-2 text-sm">
+                    <div class="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
+                    <span class="text-gray-600">Connected to APIs</span>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: Sidebar -->
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header Bar -->
+            <!-- @COMPONENT: HeaderBar -->
+            <header class="bg-white border-b border-gray-200 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 id="page-title" class="text-2xl font-semibold text-gray-900">Dashboard</h2>
+                        <p id="page-subtitle" class="text-gray-600">Overview of your companion calling setup</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <!-- @STATE: callStatus:string = 'idle' -->
+                        <div id="call-status" class="hidden flex items-center space-x-2 px-3 py-1 bg-accent/10 text-accent rounded-full text-sm font-medium">
+                            <div class="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
+                            <span>Call Active</span>
+                        </div>
+                        <button class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                            <i class="fas fa-bell text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+            </header>
+            <!-- @END_COMPONENT: HeaderBar -->
+
+            <!-- Content Sections -->
+            <main class="flex-1 overflow-auto p-6">
+                <!-- Dashboard Section -->
+                <!-- @COMPONENT: DashboardSection -->
+                <div id="dashboard-section" class="content-section">
+                    <!-- Quick Stats -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">Active Companion</p>
+                                    <p class="text-2xl font-bold text-gray-900" data-bind="activeCompanion.name">Sarah</p>
+                                </div>
+                                <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-robot text-primary text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">Total Calls</p>
+                                    <p class="text-2xl font-bold text-gray-900" data-bind="stats.totalCalls">127</p>
+                                </div>
+                                <div class="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-phone text-accent text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">Voice Model</p>
+                                    <p class="text-2xl font-bold text-gray-900" data-bind="activeVoice.name">Rachel</p>
+                                </div>
+                                <div class="w-12 h-12 bg-warning/10 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-microphone text-warning text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">API Status</p>
+                                    <p class="text-2xl font-bold text-accent">Online</p>
+                                </div>
+                                <div class="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-check-circle text-accent text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                            <div class="space-y-3">
+                                <button data-action="start-call" class="w-full flex items-center space-x-3 p-4 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors">
+                                    <i class="fas fa-phone"></i>
+                                    <span>Start Call with Sarah</span>
+                                </button>
+                                <button data-action="change-companion" class="w-full flex items-center space-x-3 p-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                                    <i class="fas fa-robot"></i>
+                                    <span>Change Companion</span>
+                                </button>
+                                <button data-action="test-voice" class="w-full flex items-center space-x-3 p-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                                    <i class="fas fa-volume-up"></i>
+                                    <span>Test Voice Sample</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+                            <div class="space-y-3" data-mock="true">
+                                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                    <div class="w-8 h-8 bg-accent/10 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-phone text-accent text-sm"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm font-medium text-gray-900">Call with Sarah</p>
+                                        <p class="text-xs text-gray-500">2 minutes ago</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                    <div class="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                                        <i class="fab fa-spotify text-primary text-sm"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm font-medium text-gray-900">Playlist created</p>
+                                        <p class="text-xs text-gray-500">1 hour ago</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                    <div class="w-8 h-8 bg-warning/10 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-file text-warning text-sm"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm font-medium text-gray-900">File shared</p>
+                                        <p class="text-xs text-gray-500">3 hours ago</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: DashboardSection -->
+
+                <!-- Call Interface Section -->
+                <!-- @COMPONENT: CallInterfaceSection -->
+                <div id="calling-section" class="content-section hidden">
+                    <div class="max-w-2xl mx-auto">
+                        <!-- Call Controls Card -->
+                        <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-center mb-6">
+                            <div class="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-primary to-primary-dark rounded-full flex items-center justify-center">
+                                <i class="fas fa-robot text-white text-4xl"></i>
+                            </div>
+                            
+                            <h3 class="text-2xl font-bold text-gray-900 mb-2" data-bind="activeCompanion.name">Sarah</h3>
+                            <p class="text-gray-600 mb-6" data-bind="callStatus">Ready to call</p>
+                            
+                            <!-- Call Status Indicator -->
+                            <div id="call-status-indicator" class="mb-6">
+                                <div class="inline-flex items-center space-x-2 px-4 py-2 bg-gray-100 rounded-full text-sm">
+                                    <div class="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                    <span class="text-gray-600">Idle</span>
+                                </div>
+                            </div>
+
+                            <!-- Primary Call Button -->
+                            <button id="primary-call-btn" data-event="click:toggleCall" class="w-20 h-20 bg-accent hover:bg-green-600 rounded-full flex items-center justify-center mb-6 mx-auto transition-all duration-200 shadow-lg">
+                                <i class="fas fa-phone text-white text-2xl"></i>
+                            </button>
+
+                            <!-- Secondary Controls -->
+                            <div class="flex justify-center space-x-4">
+                                <button data-event="click:toggleMute" class="w-12 h-12 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
+                                    <i class="fas fa-microphone-slash text-gray-600"></i>
+                                </button>
+                                <button data-event="click:toggleSpeaker" class="w-12 h-12 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
+                                    <i class="fas fa-volume-up text-gray-600"></i>
+                                </button>
+                                <button data-event="click:openSpotify" class="w-12 h-12 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors">
+                                    <i class="fab fa-spotify text-gray-600"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Audio Visualization -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h4 class="text-lg font-semibold text-gray-900 mb-4">Audio Levels</h4>
+                            <!-- @FUNCTIONALITY: This should implement real-time audio visualization using Web Audio API -->
+                            <div class="flex items-end space-x-1 h-16 bg-gray-50 rounded-lg p-4" data-implementation="Web Audio API visualization">
+                                <!-- @MAP: audioLevels.map(level => ( -->
+                                <div class="w-2 bg-primary rounded-full animate-pulse" style="height: 20%"></div>
+                                <div class="w-2 bg-primary rounded-full animate-pulse" style="height: 60%"></div>
+                                <div class="w-2 bg-primary rounded-full animate-pulse" style="height: 30%"></div>
+                                <div class="w-2 bg-primary rounded-full animate-pulse" style="height: 80%"></div>
+                                <div class="w-2 bg-primary rounded-full animate-pulse" style="height: 40%"></div>
+                                <!-- @END_MAP )) -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: CallInterfaceSection -->
+
+                <!-- Companions Section -->
+                <!-- @COMPONENT: CompanionsSection -->
+                <div id="companions-section" class="content-section hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Active Companion -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Active Companion</h3>
+                            <div class="flex items-center space-x-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                                <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-robot text-primary text-2xl"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h4 class="font-semibold text-gray-900" data-bind="activeCompanion.name">Sarah</h4>
+                                    <p class="text-sm text-gray-600" data-bind="activeCompanion.id">ID: kr_sarah_001</p>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <div class="w-2 h-2 bg-accent rounded-full"></div>
+                                        <span class="text-xs text-accent font-medium">Connected</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Change Companion -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Change Companion</h3>
+                            <form data-event="submit:changeCompanion" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Kindroid Bot ID</label>
+                                    <input 
+                                        type="text" 
+                                        data-bind="newCompanionId"
+                                        placeholder="Enter bot ID (e.g., kr_sarah_001)"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    >
+                                </div>
+                                <button 
+                                    type="submit"
+                                    class="w-full bg-primary text-white py-2 px-4 rounded-lg hover:bg-primary-dark transition-colors"
+                                >
+                                    Switch Companion
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Voice Settings -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Voice Settings</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Current Voice</label>
+                                    <div class="p-3 bg-gray-50 rounded-lg">
+                                        <p class="font-medium" data-bind="activeVoice.name">Rachel (Eleven Labs)</p>
+                                        <p class="text-sm text-gray-600" data-bind="activeVoice.id">ID: 21m00Tcm4TlvDq8ikWAM</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Change Voice ID</label>
+                                    <input 
+                                        type="text" 
+                                        data-bind="newVoiceId"
+                                        placeholder="Enter Eleven Labs Voice ID"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    >
+                                </div>
+                                <button 
+                                    data-event="click:changeVoice"
+                                    class="w-full bg-warning text-white py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors"
+                                >
+                                    Update Voice
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Test Voice -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Test Voice</h3>
+                            <div class="space-y-4">
+                                <textarea 
+                                    data-bind="testText"
+                                    placeholder="Enter text to test voice (e.g., 'Hello, this is a voice test')"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent h-24 resize-none"
+                                >Hello! This is a test of my voice. How do I sound?</textarea>
+                                <button 
+                                    data-event="click:testVoice"
+                                    class="w-full bg-accent text-white py-2 px-4 rounded-lg hover:bg-green-600 transition-colors"
+                                >
+                                    <i class="fas fa-play mr-2"></i>
+                                    Test Voice
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: CompanionsSection -->
+
+                <!-- Spotify Integration Section -->
+                <!-- @COMPONENT: SpotifySection -->
+                <div id="spotify-section" class="content-section hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Spotify Connection Status -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Spotify Connection</h3>
+                            <div class="flex items-center space-x-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                    <i class="fab fa-spotify text-green-600 text-xl"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-semibold text-gray-900">Connected to Spotify</p>
+                                    <p class="text-sm text-gray-600" data-bind="spotify.username">@musiclover123</p>
+                                </div>
+                                <div class="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
+                            </div>
+                        </div>
+
+                        <!-- Song Recommendations -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Companion Recommendations</h3>
+                            <div class="space-y-3" data-mock="true">
+                                <!-- @MAP: recommendations.map(song => ( -->
+                                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                    <!-- Album art placeholder -->
+                                    <div class="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-400 rounded"></div>
+                                    <div class="flex-1">
+                                        <p class="font-medium text-gray-900">Blinding Lights</p>
+                                        <p class="text-sm text-gray-600">The Weeknd</p>
+                                    </div>
+                                    <button class="text-green-600 hover:text-green-700">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                    <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-purple-400 rounded"></div>
+                                    <div class="flex-1">
+                                        <p class="font-medium text-gray-900">Levitating</p>
+                                        <p class="text-sm text-gray-600">Dua Lipa</p>
+                                    </div>
+                                    <button class="text-green-600 hover:text-green-700">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                                <!-- @END_MAP )) -->
+                            </div>
+                        </div>
+
+                        <!-- Playlist Management -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 lg:col-span-2">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Playlist Management</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- Create Playlist -->
+                                <div>
+                                    <h4 class="font-medium text-gray-900 mb-3">Create New Playlist</h4>
+                                    <form data-event="submit:createPlaylist" class="space-y-3">
+                                        <input 
+                                            type="text" 
+                                            data-bind="playlistName"
+                                            placeholder="Playlist name"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                                        >
+                                        <textarea 
+                                            data-bind="playlistDescription"
+                                            placeholder="Description (optional)"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm h-20 resize-none"
+                                        ></textarea>
+                                        <button 
+                                            type="submit"
+                                            class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors text-sm"
+                                        >
+                                            <i class="fab fa-spotify mr-2"></i>
+                                            Create Playlist
+                                        </button>
+                                    </form>
+                                </div>
+
+                                <!-- Recent Playlists -->
+                                <div>
+                                    <h4 class="font-medium text-gray-900 mb-3">Recent Playlists</h4>
+                                    <div class="space-y-2" data-mock="true">
+                                        <!-- @MAP: recentPlaylists.map(playlist => ( -->
+                                        <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                            <div class="w-8 h-8 bg-green-100 rounded flex items-center justify-center">
+                                                <i class="fas fa-music text-green-600 text-sm"></i>
+                                            </div>
+                                            <div class="flex-1">
+                                                <p class="text-sm font-medium text-gray-900">Chill Vibes</p>
+                                                <p class="text-xs text-gray-500">12 songs</p>
+                                            </div>
+                                            <button class="text-green-600 hover:text-green-700">
+                                                <i class="fas fa-external-link-alt text-sm"></i>
+                                            </button>
+                                        </div>
+                                        <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                            <div class="w-8 h-8 bg-green-100 rounded flex items-center justify-center">
+                                                <i class="fas fa-music text-green-600 text-sm"></i>
+                                            </div>
+                                            <div class="flex-1">
+                                                <p class="text-sm font-medium text-gray-900">Sarah's Picks</p>
+                                                <p class="text-xs text-gray-500">8 songs</p>
+                                            </div>
+                                            <button class="text-green-600 hover:text-green-700">
+                                                <i class="fas fa-external-link-alt text-sm"></i>
+                                            </button>
+                                        </div>
+                                        <!-- @END_MAP )) -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: SpotifySection -->
+
+                <!-- File Sharing Section -->
+                <!-- @COMPONENT: FilesSharingSection -->
+                <div id="files-section" class="content-section hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- File Upload -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Share File with Companion</h3>
+                            
+                            <!-- Drag & Drop Zone -->
+                            <!-- @FUNCTIONALITY: Implement file drag & drop with File API -->
+                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors" data-implementation="File drag & drop zone">
+                                <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <i class="fas fa-cloud-upload-alt text-gray-400 text-2xl"></i>
+                                </div>
+                                <p class="text-gray-600 mb-2">Drag & drop files here or</p>
+                                <button class="text-primary hover:text-primary-dark font-medium">browse files</button>
+                                <p class="text-xs text-gray-500 mt-2">Max file size: 10MB</p>
+                            </div>
+
+                            <!-- File Input -->
+                            <input type="file" class="hidden" id="file-input" multiple>
+                            
+                            <!-- Selected Files -->
+                            <div class="mt-4 space-y-2" id="selected-files" data-mock="true">
+                                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                    <div class="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+                                        <i class="fas fa-file-pdf text-blue-600"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm font-medium text-gray-900">document.pdf</p>
+                                        <p class="text-xs text-gray-500">2.3 MB</p>
+                                    </div>
+                                    <button class="text-error hover:text-red-700">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Send Button -->
+                            <button 
+                                data-event="click:shareFiles"
+                                class="w-full bg-primary text-white py-3 px-4 rounded-lg hover:bg-primary-dark transition-colors mt-4"
+                            >
+                                <i class="fas fa-share mr-2"></i>
+                                Share with Sarah
+                            </button>
+                        </div>
+
+                        <!-- File History -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Shared Files History</h3>
+                            <div class="space-y-3" data-mock="true">
+                                <!-- @MAP: sharedFiles.map(file => ( -->
+                                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                    <div class="w-10 h-10 bg-green-100 rounded flex items-center justify-center">
+                                        <i class="fas fa-file-image text-green-600"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm font-medium text-gray-900">vacation_photo.jpg</p>
+                                        <p class="text-xs text-gray-500">Shared 2 hours ago</p>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-2 h-2 bg-accent rounded-full"></div>
+                                        <span class="text-xs text-accent">Viewed</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                    <div class="w-10 h-10 bg-red-100 rounded flex items-center justify-center">
+                                        <i class="fas fa-file-pdf text-red-600"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-sm font-medium text-gray-900">notes.pdf</p>
+                                        <p class="text-xs text-gray-500">Shared yesterday</p>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                        <span class="text-xs text-gray-500">Pending</span>
+                                    </div>
+                                </div>
+                                <!-- @END_MAP )) -->
+                            </div>
+                        </div>
+
+                        <!-- File Sharing Settings -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 lg:col-span-2">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">File Sharing Settings</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Auto-Share Types</label>
+                                    <div class="space-y-2">
+                                        <label class="flex items-center">
+                                            <input type="checkbox" checked class="rounded border-gray-300 text-primary focus:ring-primary">
+                                            <span class="ml-2 text-sm text-gray-700">Images</span>
+                                        </label>
+                                        <label class="flex items-center">
+                                            <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                            <span class="ml-2 text-sm text-gray-700">Documents</span>
+                                        </label>
+                                        <label class="flex items-center">
+                                            <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                            <span class="ml-2 text-sm text-gray-700">Audio Files</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Max File Size</label>
+                                    <select class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                        <option>5 MB</option>
+                                        <option selected>10 MB</option>
+                                        <option>25 MB</option>
+                                        <option>50 MB</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Storage Usage</label>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="bg-primary h-2 rounded-full" style="width: 35%"></div>
+                                    </div>
+                                    <p class="text-sm text-gray-600 mt-1">3.5 GB of 10 GB used</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: FilesSharingSection -->
+
+                <!-- SMS Management Section -->
+                <!-- @COMPONENT: SMSSection -->
+                <div id="sms-section" class="content-section hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- SMS Setup -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">SMS Bot Management</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Your Phone Number</label>
+                                    <input 
+                                        type="tel" 
+                                        data-bind="phonenumber"
+                                        placeholder="+1 (555) 123-4567"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    >
+                                </div>
+                                
+                                <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                    <div class="flex items-start space-x-3">
+                                        <i class="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                                        <div>
+                                            <p class="text-sm font-medium text-blue-900">SMS Bot Commands</p>
+                                            <ul class="text-sm text-blue-800 mt-1 space-y-1">
+                                                <li>• "bot sarah" - Switch to Sarah</li>
+                                                <li>• "voice rachel" - Change to Rachel voice</li>
+                                                <li>• "call start" - Start a call</li>
+                                                <li>• "status" - Get current setup</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center space-x-3">
+                                    <input 
+                                        type="checkbox" 
+                                        id="sms-consent"
+                                        class="rounded border-gray-300 text-primary focus:ring-primary"
+                                    >
+                                    <label for="sms-consent" class="text-sm text-gray-700">
+                                        I consent to receive SMS messages for bot management
+                                    </label>
+                                </div>
+
+                                <button 
+                                    data-event="click:setupSMS"
+                                    class="w-full bg-primary text-white py-2 px-4 rounded-lg hover:bg-primary-dark transition-colors"
+                                >
+                                    Setup SMS Management
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- SMS History -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent SMS Commands</h3>
+                            <div class="space-y-3" data-mock="true">
+                                <!-- @MAP: smsHistory.map(message => ( -->
+                                <div class="p-3 bg-gray-50 rounded-lg">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-sm font-medium text-gray-900">Incoming Command</span>
+                                        <span class="text-xs text-gray-500">2 min ago</span>
+                                    </div>
+                                    <p class="text-sm text-gray-700 mb-1">"bot sarah"</p>
+                                    <p class="text-xs text-accent">✓ Switched to Sarah companion</p>
+                                </div>
+                                <div class="p-3 bg-gray-50 rounded-lg">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-sm font-medium text-gray-900">Incoming Command</span>
+                                        <span class="text-xs text-gray-500">1 hour ago</span>
+                                    </div>
+                                    <p class="text-sm text-gray-700 mb-1">"voice rachel"</p>
+                                    <p class="text-xs text-accent">✓ Changed voice to Rachel</p>
+                                </div>
+                                <div class="p-3 bg-gray-50 rounded-lg">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-sm font-medium text-gray-900">Outgoing Status</span>
+                                        <span class="text-xs text-gray-500">3 hours ago</span>
+                                    </div>
+                                    <p class="text-sm text-gray-700 mb-1">Current setup: Sarah with Rachel voice</p>
+                                    <p class="text-xs text-gray-500">Response to "status" command</p>
+                                </div>
+                                <!-- @END_MAP )) -->
+                            </div>
+                        </div>
+
+                        <!-- SMS Settings -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 lg:col-span-2">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">SMS Settings</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-medium text-gray-900 mb-3">Notification Preferences</h4>
+                                    <div class="space-y-3">
+                                        <label class="flex items-center justify-between">
+                                            <span class="text-sm text-gray-700">Call start/end notifications</span>
+                                            <input type="checkbox" checked class="rounded border-gray-300 text-primary focus:ring-primary">
+                                        </label>
+                                        <label class="flex items-center justify-between">
+                                            <span class="text-sm text-gray-700">Bot change confirmations</span>
+                                            <input type="checkbox" checked class="rounded border-gray-300 text-primary focus:ring-primary">
+                                        </label>
+                                        <label class="flex items-center justify-between">
+                                            <span class="text-sm text-gray-700">Error notifications</span>
+                                            <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                        </label>
+                                        <label class="flex items-center justify-between">
+                                            <span class="text-sm text-gray-700">Daily status reports</span>
+                                            <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                        </label>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-gray-900 mb-3">Custom Commands</h4>
+                                    <div class="space-y-3">
+                                        <div class="flex space-x-2">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Command (e.g., 'quick')"
+                                                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                                            >
+                                            <input 
+                                                type="text" 
+                                                placeholder="Action (e.g., 'call start')"
+                                                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                                            >
+                                        </div>
+                                        <button class="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+                                            Add Custom Command
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: SMSSection -->
+
+                <!-- API Credentials Section -->
+                <!-- @COMPONENT: CredentialsSection -->
+                <div id="credentials-section" class="content-section hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Kindroid API -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Kindroid API</h3>
+                            <form data-event="submit:saveKindroidCredentials" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+                                    <div class="relative">
+                                        <input 
+                                            type="password" 
+                                            data-bind="kindroidApiKey"
+                                            placeholder="Enter your Kindroid API key"
+                                            class="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-roboto-mono text-sm"
+                                        >
+                                        <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                            <i class="fas fa-eye text-gray-400 hover:text-gray-600"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-error rounded-full"></div>
+                                    <span class="text-sm text-error">Not Connected</span>
+                                </div>
+                                <div class="flex space-x-3">
+                                    <button 
+                                        type="submit"
+                                        class="flex-1 bg-primary text-white py-2 px-4 rounded-lg hover:bg-primary-dark transition-colors"
+                                    >
+                                        Save & Test
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        data-event="click:testKindroidConnection"
+                                        class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                    >
+                                        <i class="fas fa-flask"></i>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Eleven Labs API -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Eleven Labs API</h3>
+                            <form data-event="submit:saveElevenLabsCredentials" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+                                    <div class="relative">
+                                        <input 
+                                            type="password" 
+                                            data-bind="elevenLabsApiKey"
+                                            placeholder="Enter your Eleven Labs API key"
+                                            class="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-roboto-mono text-sm"
+                                        >
+                                        <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                            <i class="fas fa-eye text-gray-400 hover:text-gray-600"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Voice Tier</label>
+                                    <select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                        <option>Starter (Cheaper)</option>
+                                        <option>Creator</option>
+                                        <option>Pro</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-accent rounded-full"></div>
+                                    <span class="text-sm text-accent">Connected</span>
+                                </div>
+                                <div class="flex space-x-3">
+                                    <button 
+                                        type="submit"
+                                        class="flex-1 bg-primary text-white py-2 px-4 rounded-lg hover:bg-primary-dark transition-colors"
+                                    >
+                                        Save & Test
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        data-event="click:testElevenLabsConnection"
+                                        class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                    >
+                                        <i class="fas fa-flask"></i>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Spotify API -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Spotify API</h3>
+                            <form data-event="submit:saveSpotifyCredentials" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Client ID</label>
+                                    <input 
+                                        type="text" 
+                                        data-bind="spotifyClientId"
+                                        placeholder="Your Spotify Client ID"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-roboto-mono text-sm"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Client Secret</label>
+                                    <div class="relative">
+                                        <input 
+                                            type="password" 
+                                            data-bind="spotifyClientSecret"
+                                            placeholder="Your Spotify Client Secret"
+                                            class="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-roboto-mono text-sm"
+                                        >
+                                        <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                            <i class="fas fa-eye text-gray-400 hover:text-gray-600"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-accent rounded-full"></div>
+                                    <span class="text-sm text-accent">Connected</span>
+                                </div>
+                                <div class="flex space-x-3">
+                                    <button 
+                                        type="submit"
+                                        class="flex-1 bg-primary text-white py-2 px-4 rounded-lg hover:bg-primary-dark transition-colors"
+                                    >
+                                        Save & Test
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        data-event="click:testSpotifyConnection"
+                                        class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                    >
+                                        <i class="fas fa-flask"></i>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Twilio API -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Twilio API</h3>
+                            <form data-event="submit:saveTwilioCredentials" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Account SID</label>
+                                    <input 
+                                        type="text" 
+                                        data-bind="twilioAccountSid"
+                                        placeholder="Your Twilio Account SID"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-roboto-mono text-sm"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Auth Token</label>
+                                    <div class="relative">
+                                        <input 
+                                            type="password" 
+                                            data-bind="twilioAuthToken"
+                                            placeholder="Your Twilio Auth Token"
+                                            class="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent font-roboto-mono text-sm"
+                                        >
+                                        <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                            <i class="fas fa-eye text-gray-400 hover:text-gray-600"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                                    <input 
+                                        type="tel" 
+                                        data-bind="twiliophonenumber"
+                                        placeholder="+1234567890"
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    >
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 bg-accent rounded-full"></div>
+                                    <span class="text-sm text-accent">Connected</span>
+                                </div>
+                                <div class="flex space-x-3">
+                                    <button 
+                                        type="submit"
+                                        class="flex-1 bg-primary text-white py-2 px-4 rounded-lg hover:bg-primary-dark transition-colors"
+                                    >
+                                        Save & Test
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        data-event="click:testTwilioConnection"
+                                        class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                    >
+                                        <i class="fas fa-flask"></i>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Security Notice -->
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-6 mt-6">
+                        <div class="flex items-start space-x-3">
+                            <i class="fas fa-shield-alt text-amber-600 mt-1"></i>
+                            <div>
+                                <h4 class="font-semibold text-amber-900 mb-2">API Key Security</h4>
+                                <ul class="text-sm text-amber-800 space-y-1">
+                                    <li>• All API keys are encrypted and stored securely</li>
+                                    <li>• Keys are never transmitted in plain text</li>
+                                    <li>• You can revoke access at any time</li>
+                                    <li>• Regular security audits are performed</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: CredentialsSection -->
+
+                <!-- Diagnostics Section -->
+                <!-- @COMPONENT: DiagnosticsSection -->
+                <div id="diagnostics-section" class="content-section hidden">
+                    <!-- System Status Overview -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">API Health</p>
+                                    <p class="text-2xl font-bold text-accent">98%</p>
+                                </div>
+                                <div class="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-heartbeat text-accent text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">Response Time</p>
+                                    <p class="text-2xl font-bold text-gray-900">245ms</p>
+                                </div>
+                                <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-clock text-primary text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">Errors (24h)</p>
+                                    <p class="text-2xl font-bold text-gray-900">3</p>
+                                </div>
+                                <div class="w-12 h-12 bg-warning/10 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-exclamation-triangle text-warning text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">Uptime</p>
+                                    <p class="text-2xl font-bold text-accent">99.8%</p>
+                                </div>
+                                <div class="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-arrow-up text-accent text-xl"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- API Status -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">API Service Status</h3>
+                            <div class="space-y-4">
+                                <!-- Kindroid API -->
+                                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-3 h-3 bg-accent rounded-full"></div>
+                                        <div>
+                                            <p class="font-medium text-gray-900">Kindroid API</p>
+                                            <p class="text-sm text-gray-600">Speech-to-Text</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-sm text-accent font-medium">Operational</span>
+                                </div>
+
+                                <!-- Eleven Labs API -->
+                                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-3 h-3 bg-accent rounded-full"></div>
+                                        <div>
+                                            <p class="font-medium text-gray-900">Eleven Labs API</p>
+                                            <p class="text-sm text-gray-600">Text-to-Speech</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-sm text-accent font-medium">Operational</span>
+                                </div>
+
+                                <!-- Twilio API -->
+                                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-3 h-3 bg-accent rounded-full"></div>
+                                        <div>
+                                            <p class="font-medium text-gray-900">Twilio API</p>
+                                            <p class="text-sm text-gray-600">Voice Calls & SMS</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-sm text-accent font-medium">Operational</span>
+                                </div>
+
+                                <!-- Spotify API -->
+                                <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-3 h-3 bg-warning rounded-full"></div>
+                                        <div>
+                                            <p class="font-medium text-gray-900">Spotify API</p>
+                                            <p class="text-sm text-gray-600">Music Integration</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-sm text-warning font-medium">Degraded</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Error Log -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Errors</h3>
+                            <div class="space-y-3" data-mock="true">
+                                <!-- @MAP: errorLogs.map(error => ( -->
+                                <div class="p-3 bg-red-50 rounded-lg border border-red-200">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex items-start space-x-3">
+                                            <i class="fas fa-exclamation-circle text-error mt-0.5"></i>
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900">Spotify Rate Limit</p>
+                                                <p class="text-xs text-gray-600">API quota exceeded</p>
+                                            </div>
+                                        </div>
+                                        <span class="text-xs text-gray-500">2 min ago</span>
+                                    </div>
+                                </div>
+                                <div class="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex items-start space-x-3">
+                                            <i class="fas fa-exclamation-triangle text-warning mt-0.5"></i>
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900">Voice Synthesis Slow</p>
+                                                <p class="text-xs text-gray-600">Response time > 5s</p>
+                                            </div>
+                                        </div>
+                                        <span class="text-xs text-gray-500">1 hour ago</span>
+                                    </div>
+                                </div>
+                                <div class="p-3 bg-red-50 rounded-lg border border-red-200">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex items-start space-x-3">
+                                            <i class="fas fa-times-circle text-error mt-0.5"></i>
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900">Webhook Timeout</p>
+                                                <p class="text-xs text-gray-600">Failed to receive response</p>
+                                            </div>
+                                        </div>
+                                        <span class="text-xs text-gray-500">3 hours ago</span>
+                                    </div>
+                                </div>
+                                <!-- @END_MAP )) -->
+                            </div>
+                        </div>
+
+                        <!-- Performance Metrics -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 lg:col-span-2">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Performance Metrics</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <h4 class="font-medium text-gray-900 mb-3">API Response Times</h4>
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between text-sm">
+                                            <span>Kindroid STT</span>
+                                            <span class="font-medium">180ms</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-2">
+                                            <div class="bg-accent h-2 rounded-full" style="width: 60%"></div>
+                                        </div>
+                                        
+                                        <div class="flex items-center justify-between text-sm">
+                                            <span>Eleven Labs TTS</span>
+                                            <span class="font-medium">320ms</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-2">
+                                            <div class="bg-primary h-2 rounded-full" style="width: 80%"></div>
+                                        </div>
+                                        
+                                        <div class="flex items-center justify-between text-sm">
+                                            <span>Spotify API</span>
+                                            <span class="font-medium">450ms</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-2">
+                                            <div class="bg-warning h-2 rounded-full" style="width: 90%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-medium text-gray-900 mb-3">Success Rates</h4>
+                                    <div class="space-y-3">
+                                        <div class="text-center">
+                                            <div class="text-2xl font-bold text-accent">99.2%</div>
+                                            <div class="text-sm text-gray-600">Voice Calls</div>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="text-2xl font-bold text-primary">97.8%</div>
+                                            <div class="text-sm text-gray-600">File Sharing</div>
+                                        </div>
+                                        <div class="text-center">
+                                            <div class="text-2xl font-bold text-warning">94.5%</div>
+                                            <div class="text-sm text-gray-600">Spotify Sync</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-medium text-gray-900 mb-3">System Resources</h4>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <div class="flex justify-between text-sm mb-1">
+                                                <span>CPU Usage</span>
+                                                <span>23%</span>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                                <div class="bg-accent h-2 rounded-full" style="width: 23%"></div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="flex justify-between text-sm mb-1">
+                                                <span>Memory</span>
+                                                <span>67%</span>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                                <div class="bg-primary h-2 rounded-full" style="width: 67%"></div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="flex justify-between text-sm mb-1">
+                                                <span>Bandwidth</span>
+                                                <span>45%</span>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                                <div class="bg-warning h-2 rounded-full" style="width: 45%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Connection Tests -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 lg:col-span-2">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Connection Testing</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-medium text-gray-900 mb-3">Manual Tests</h4>
+                                    <div class="space-y-2">
+                                        <button 
+                                            data-event="click:testAllConnections"
+                                            class="w-full bg-primary text-white py-2 px-4 rounded-lg hover:bg-primary-dark transition-colors text-sm"
+                                        >
+                                            <i class="fas fa-flask mr-2"></i>
+                                            Test All Connections
+                                        </button>
+                                        <button 
+                                            data-event="click:testVoiceChain"
+                                            class="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                                        >
+                                            <i class="fas fa-microphone mr-2"></i>
+                                            Test Voice Chain
+                                        </button>
+                                        <button 
+                                            data-event="click:testWebhooks"
+                                            class="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                                        >
+                                            <i class="fas fa-link mr-2"></i>
+                                            Test Webhooks
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-gray-900 mb-3">Automated Monitoring</h4>
+                                    <div class="space-y-3">
+                                        <label class="flex items-center justify-between">
+                                            <span class="text-sm text-gray-700">Health check every 5 minutes</span>
+                                            <input type="checkbox" checked class="rounded border-gray-300 text-primary focus:ring-primary">
+                                        </label>
+                                        <label class="flex items-center justify-between">
+                                            <span class="text-sm text-gray-700">Error alerts via email</span>
+                                            <input type="checkbox" checked class="rounded border-gray-300 text-primary focus:ring-primary">
+                                        </label>
+                                        <label class="flex items-center justify-between">
+                                            <span class="text-sm text-gray-700">Performance monitoring</span>
+                                            <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: DiagnosticsSection -->
+
+                <!-- Setup Guide Section -->
+                <!-- @COMPONENT: SetupSection -->
+                <div id="setup-section" class="content-section hidden">
+                    <div class="max-w-4xl mx-auto">
+                        <!-- Setup Progress -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Setup Progress</h3>
+                            <div class="flex items-center space-x-4">
+                                <div class="flex-1">
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="bg-primary h-2 rounded-full" style="width: 60%"></div>
+                                    </div>
+                                </div>
+                                <span class="text-sm text-gray-600">6 of 10 steps complete</span>
+                            </div>
+                        </div>
+
+                        <!-- Setup Steps -->
+                        <div class="space-y-6">
+                            <!-- Step 1: Kindroid Setup -->
+                            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-8 h-8 bg-accent rounded-full flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-check text-white text-sm"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h4 class="text-lg font-semibold text-gray-900 mb-2">1. Kindroid API Setup</h4>
+                                        <p class="text-gray-600 mb-4">Configure your Kindroid companion for voice interactions.</p>
+                                        <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                                            <div>
+                                                <h5 class="font-medium text-gray-900 mb-2">Steps:</h5>
+                                                <ol class="list-decimal list-inside text-sm text-gray-700 space-y-1">
+                                                    <li>Go to your Kindroid dashboard</li>
+                                                    <li>Navigate to Settings → API Access</li>
+                                                    <li>Generate a new API key</li>
+                                                    <li>Copy your bot ID from the companion settings</li>
+                                                    <li>Enter both values in the Credentials section</li>
+                                                </ol>
+                                            </div>
+                                            <div class="flex items-center space-x-2 text-sm">
+                                                <i class="fas fa-check-circle text-accent"></i>
+                                                <span class="text-accent">Completed</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Step 2: Eleven Labs Setup -->
+                            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-8 h-8 bg-accent rounded-full flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-check text-white text-sm"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h4 class="text-lg font-semibold text-gray-900 mb-2">2. Eleven Labs Voice Setup</h4>
+                                        <p class="text-gray-600 mb-4">Configure text-to-speech with affordable voice options.</p>
+                                        <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                                            <div>
+                                                <h5 class="font-medium text-gray-900 mb-2">Steps:</h5>
+                                                <ol class="list-decimal list-inside text-sm text-gray-700 space-y-1">
+                                                    <li>Create account at elevenlabs.io</li>
+                                                    <li>Choose the Starter plan (most affordable)</li>
+                                                    <li>Go to Profile → API Keys</li>
+                                                    <li>Generate and copy your API key</li>
+                                                    <li>Browse voice library and copy desired voice ID</li>
+                                                </ol>
+                                            </div>
+                                            <div class="flex items-center space-x-2 text-sm">
+                                                <i class="fas fa-check-circle text-accent"></i>
+                                                <span class="text-accent">Completed</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Step 3: Spotify Setup -->
+                            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-clock text-white text-sm"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h4 class="text-lg font-semibold text-gray-900 mb-2">3. Spotify Developer Setup</h4>
+                                        <p class="text-gray-600 mb-4">Enable music integration for your companion.</p>
+                                        <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                                            <div>
+                                                <h5 class="font-medium text-gray-900 mb-2">Steps:</h5>
+                                                <ol class="list-decimal list-inside text-sm text-gray-700 space-y-1">
+                                                    <li>Go to developer.spotify.com</li>
+                                                    <li>Log in with your Spotify account</li>
+                                                    <li>Create a new app in the dashboard</li>
+                                                    <li>Copy Client ID and Client Secret</li>
+                                                    <li>Add redirect URI: http://localhost:3000/callback</li>
+                                                </ol>
+                                            </div>
+                                            <div class="flex items-center space-x-2 text-sm">
+                                                <i class="fas fa-clock text-warning"></i>
+                                                <span class="text-warning">In Progress</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Step 4: Twilio Setup -->
+                            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <span class="text-gray-600 text-sm font-bold">4</span>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h4 class="text-lg font-semibold text-gray-900 mb-2">4. Twilio Voice & SMS Setup</h4>
+                                        <p class="text-gray-600 mb-4">Configure calling functionality and SMS management.</p>
+                                        <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                                            <div>
+                                                <h5 class="font-medium text-gray-900 mb-2">Steps:</h5>
+                                                <ol class="list-decimal list-inside text-sm text-gray-700 space-y-1">
+                                                    <li>Sign up at twilio.com (free trial available)</li>
+                                                    <li>Verify your phone number</li>
+                                                    <li>Purchase a phone number for calls/SMS</li>
+                                                    <li>Get Account SID and Auth Token from console</li>
+                                                    <li>Configure webhook URLs for voice and SMS</li>
+                                                </ol>
+                                            </div>
+                                            <div class="flex items-center space-x-2 text-sm">
+                                                <i class="fas fa-circle text-gray-400"></i>
+                                                <span class="text-gray-500">Pending</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Step 5: Webhook Configuration -->
+                            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <span class="text-gray-600 text-sm font-bold">5</span>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h4 class="text-lg font-semibold text-gray-900 mb-2">5. Webhook Configuration</h4>
+                                        <p class="text-gray-600 mb-4">Set up public URLs for API communication.</p>
+                                        <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+                                            <div>
+                                                <h5 class="font-medium text-gray-900 mb-2">Required Webhooks:</h5>
+                                                <ul class="text-sm text-gray-700 space-y-1">
+                                                    <li>• <code class="bg-gray-200 px-2 py-1 rounded text-xs">/webhook/voice</code> - Twilio voice calls</li>
+                                                    <li>• <code class="bg-gray-200 px-2 py-1 rounded text-xs">/webhook/sms</code> - SMS bot management</li>
+                                                    <li>• <code class="bg-gray-200 px-2 py-1 rounded text-xs">/webhook/status</code> - Status callbacks</li>
+                                                </ul>
+                                            </div>
+                                            <div class="flex items-center space-x-2 text-sm">
+                                                <i class="fas fa-circle text-gray-400"></i>
+                                                <span class="text-gray-500">Pending</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Troubleshooting -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mt-8">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Common Issues & Solutions</h3>
+                            <div class="space-y-4">
+                                <details class="group">
+                                    <summary class="flex items-center justify-between cursor-pointer p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
+                                        <span class="font-medium text-gray-900">API Connection Failures</span>
+                                        <i class="fas fa-chevron-down group-open:rotate-180 transition-transform"></i>
+                                    </summary>
+                                    <div class="mt-3 p-3 bg-gray-50 rounded-lg text-sm text-gray-700">
+                                        <ul class="space-y-1">
+                                            <li>• Check that API keys are correctly entered</li>
+                                            <li>• Verify your account has sufficient credits/quota</li>
+                                            <li>• Test connection using the diagnostic tools</li>
+                                            <li>• Check firewall settings for outbound API calls</li>
+                                        </ul>
+                                    </div>
+                                </details>
+
+                                <details class="group">
+                                    <summary class="flex items-center justify-between cursor-pointer p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
+                                        <span class="font-medium text-gray-900">Voice Quality Issues</span>
+                                        <i class="fas fa-chevron-down group-open:rotate-180 transition-transform"></i>
+                                    </summary>
+                                    <div class="mt-3 p-3 bg-gray-50 rounded-lg text-sm text-gray-700">
+                                        <ul class="space-y-1">
+                                            <li>• Try different Eleven Labs voice models</li>
+                                            <li>• Check your internet connection stability</li>
+                                            <li>• Adjust audio settings in browser</li>
+                                            <li>• Consider upgrading Eleven Labs plan for better quality</li>
+                                        </ul>
+                                    </div>
+                                </details>
+
+                                <details class="group">
+                                    <summary class="flex items-center justify-between cursor-pointer p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
+                                        <span class="font-medium text-gray-900">SMS Not Working</span>
+                                        <i class="fas fa-chevron-down group-open:rotate-180 transition-transform"></i>
+                                    </summary>
+                                    <div class="mt-3 p-3 bg-gray-50 rounded-lg text-sm text-gray-700">
+                                        <ul class="space-y-1">
+                                            <li>• Verify phone number format (+1234567890)</li>
+                                            <li>• Check Twilio account balance and status</li>
+                                            <li>• Ensure SMS consent checkbox is checked</li>
+                                            <li>• Test with simple commands like "status"</li>
+                                        </ul>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: SetupSection -->
+
+                <!-- Legal & ToS Section -->
+                <!-- @COMPONENT: LegalSection -->
+                <div id="legal-section" class="content-section hidden">
+                    <div class="max-w-4xl mx-auto space-y-8">
+                        <!-- Disclaimer -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Important Disclaimer</h3>
+                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                <div class="flex items-start space-x-3">
+                                    <i class="fas fa-exclamation-triangle text-amber-600 mt-1"></i>
+                                    <div>
+                                        <p class="text-amber-900 font-medium mb-2">Third-Party Service Notice</p>
+                                        <p class="text-amber-800 text-sm">
+                                            SoulSyncConnect is an independent application and is not affiliated with, endorsed by, or connected to Kindroid, Eleven Labs, Twilio, or Spotify. 
+                                            This app facilitates connections to these services using your own API credentials and accounts.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Terms of Service -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Terms of Service</h3>
+                            <div class="prose prose-gray max-w-none text-sm">
+                                <h4 class="text-base font-semibold text-gray-900 mt-6 mb-3">1. Acceptance of Terms</h4>
+                                <p class="text-gray-700 mb-4">
+                                    By using SoulSyncConnect, you agree to these Terms of Service and acknowledge that you understand the responsibilities outlined herein.
+                                </p>
+
+                                <h4 class="text-base font-semibold text-gray-900 mt-6 mb-3">2. Third-Party Services</h4>
+                                <p class="text-gray-700 mb-4">
+                                    This application requires accounts and API access to third-party services. You are responsible for:
+                                </p>
+                                <ul class="list-disc list-inside text-gray-700 mb-4 space-y-1">
+                                    <li>Maintaining valid accounts with Kindroid, Eleven Labs, Twilio, and Spotify</li>
+                                    <li>Complying with each service's terms of use and pricing</li>
+                                    <li>Managing your API usage and associated costs</li>
+                                    <li>Keeping your API credentials secure</li>
+                                </ul>
+
+                                <h4 class="text-base font-semibold text-gray-900 mt-6 mb-3">3. SMS Consent</h4>
+                                <p class="text-gray-700 mb-4">
+                                    By enabling SMS functionality, you consent to receive text messages for bot management purposes. 
+                                    Message and data rates may apply. You can opt out at any time by disabling SMS features.
+                                </p>
+
+                                <h4 class="text-base font-semibold text-gray-900 mt-6 mb-3">4. Data Handling</h4>
+                                <p class="text-gray-700 mb-4">
+                                    Your API credentials are encrypted and stored locally. We do not have access to your third-party accounts 
+                                    or the content of your conversations with AI companions.
+                                </p>
+
+                                <h4 class="text-base font-semibold text-gray-900 mt-6 mb-3">5. Limitation of Liability</h4>
+                                <p class="text-gray-700 mb-4">
+                                    SoulSyncConnect is provided "as is" without warranties. We are not responsible for service interruptions, 
+                                    API costs, or issues arising from third-party service changes.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Privacy Policy -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Privacy Policy</h3>
+                            <div class="prose prose-gray max-w-none text-sm">
+                                <h4 class="text-base font-semibold text-gray-900 mt-6 mb-3">Information We Collect</h4>
+                                <p class="text-gray-700 mb-4">
+                                    We collect only the information necessary to provide our service:
+                                </p>
+                                <ul class="list-disc list-inside text-gray-700 mb-4 space-y-1">
+                                    <li>API credentials (encrypted and stored locally)</li>
+                                    <li>Phone numbers for SMS functionality (if enabled)</li>
+                                    <li>Basic usage analytics (anonymized)</li>
+                                    <li>Error logs for debugging purposes</li>
+                                </ul>
+
+                                <h4 class="text-base font-semibold text-gray-900 mt-6 mb-3">How We Protect Your Data</h4>
+                                <ul class="list-disc list-inside text-gray-700 mb-4 space-y-1">
+                                    <li>All API keys are encrypted using industry-standard encryption</li>
+                                    <li>Credentials are stored locally on your device</li>
+                                    <li>We never store or transmit your conversation content</li>
+                                    <li>No data is shared with third parties for marketing</li>
+                                </ul>
+
+                                <h4 class="text-base font-semibold text-gray-900 mt-6 mb-3">Data Retention</h4>
+                                <p class="text-gray-700 mb-4">
+                                    Your API credentials and settings are stored locally and can be deleted at any time by clearing the application data. 
+                                    Error logs are automatically purged after 30 days.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Contact Information -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Contact & Support</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-medium text-gray-900 mb-2">Technical Support</h4>
+                                    <p class="text-sm text-gray-600 mb-2">For setup assistance and technical issues:</p>
+                                    <p class="text-sm text-primary">support@soulsyncconnect.app</p>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-gray-900 mb-2">Legal Inquiries</h4>
+                                    <p class="text-sm text-gray-600 mb-2">For legal questions and compliance:</p>
+                                    <p class="text-sm text-primary">legal@soulsyncconnect.app</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Consent Form -->
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">User Consent</h3>
+                            <form data-event="submit:saveConsent" class="space-y-4">
+                                <div class="space-y-3">
+                                    <label class="flex items-start space-x-3">
+                                        <input type="checkbox" class="mt-1 rounded border-gray-300 text-primary focus:ring-primary">
+                                        <span class="text-sm text-gray-700">
+                                            I acknowledge that SoulSyncConnect is not affiliated with Kindroid, Eleven Labs, Twilio, or Spotify
+                                        </span>
+                                    </label>
+                                    <label class="flex items-start space-x-3">
+                                        <input type="checkbox" class="mt-1 rounded border-gray-300 text-primary focus:ring-primary">
+                                        <span class="text-sm text-gray-700">
+                                            I agree to the Terms of Service and understand my responsibilities regarding third-party services
+                                        </span>
+                                    </label>
+                                    <label class="flex items-start space-x-3">
+                                        <input type="checkbox" class="mt-1 rounded border-gray-300 text-primary focus:ring-primary">
+                                        <span class="text-sm text-gray-700">
+                                            I consent to receive SMS messages for bot management (if SMS features are enabled)
+                                        </span>
+                                    </label>
+                                    <label class="flex items-start space-x-3">
+                                        <input type="checkbox" class="mt-1 rounded border-gray-300 text-primary focus:ring-primary">
+                                        <span class="text-sm text-gray-700">
+                                            I have read and agree to the Privacy Policy regarding data handling
+                                        </span>
+                                    </label>
+                                </div>
+                                <button 
+                                    type="submit"
+                                    class="w-full bg-primary text-white py-3 px-4 rounded-lg hover:bg-primary-dark transition-colors"
+                                >
+                                    I Agree - Begin Setup
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: LegalSection -->
+            </main>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: AppShell -->
+
+    <!-- Toast Notifications -->
+    <!-- @COMPONENT: ToastNotifications -->
+    <div id="toast-container" class="fixed top-4 right-4 space-y-2 z-50">
+        <!-- Toast notifications will be dynamically inserted here -->
+    </div>
+    <!-- @END_COMPONENT: ToastNotifications -->
+
+    <script>
+        // Navigation functionality
+        (function() {
+            const navItems = document.querySelectorAll('.nav-item');
+            const contentSections = document.querySelectorAll('.content-section');
+            const pageTitle = document.getElementById('page-title');
+            const pageSubtitle = document.getElementById('page-subtitle');
+
+            // Page configurations
+            const pageConfig = {
+                'dashboard': {
+                    title: 'Dashboard',
+                    subtitle: 'Overview of your companion calling setup'
+                },
+                'calling': {
+                    title: 'Call Interface',
+                    subtitle: 'Start and manage calls with your companion'
+                },
+                'companions': {
+                    title: 'Companion Management',
+                    subtitle: 'Change bots and configure voice settings'
+                },
+                'spotify': {
+                    title: 'Spotify Integration',
+                    subtitle: 'Music recommendations and playlist management'
+                },
+                'files': {
+                    title: 'File Sharing',
+                    subtitle: 'Share files with your companion'
+                },
+                'sms': {
+                    title: 'SMS Management',
+                    subtitle: 'Bot control via text messages'
+                },
+                'credentials': {
+                    title: 'API Credentials',
+                    subtitle: 'Configure your third-party service connections'
+                },
+                'diagnostics': {
+                    title: 'System Diagnostics',
+                    subtitle: 'Monitor performance and troubleshoot issues'
+                },
+                'setup': {
+                    title: 'Setup Guide',
+                    subtitle: 'Step-by-step configuration instructions'
+                },
+                'legal': {
+                    title: 'Legal & Terms',
+                    subtitle: 'Terms of service and privacy policy'
+                }
+            };
+
+            function showSection(sectionId) {
+                // Hide all sections
+                contentSections.forEach(section => {
+                    section.classList.add('hidden');
+                });
+
+                // Show selected section
+                const targetSection = document.getElementById(sectionId + '-section');
+                if (targetSection) {
+                    targetSection.classList.remove('hidden');
+                }
+
+                // Update page title and subtitle
+                const config = pageConfig[sectionId];
+                if (config) {
+                    pageTitle.textContent = config.title;
+                    pageSubtitle.textContent = config.subtitle;
+                }
+
+                // Update active nav item
+                navItems.forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                const activeItem = document.querySelector(`[data-section="${sectionId}"]`);
+                if (activeItem) {
+                    activeItem.classList.add('active');
+                }
+            }
+
+            // Add click handlers to navigation items
+            navItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const sectionId = item.dataset.section;
+                    showSection(sectionId);
+                });
+            });
+
+            // Show dashboard by default
+            showSection('dashboard');
+        })();
+
+        // TODO: Implement business logic, API calls, and state management
+        // TODO: Add real-time audio processing for call interface
+        // TODO: Implement file upload and sharing functionality
+        // TODO: Add SMS webhook handling
+        // TODO: Implement API credential validation and testing
+        // TODO: Add real-time diagnostics and monitoring
+        // TODO: Implement Spotify playlist creation and management
+        
+        // Placeholder for future functionality
+        console.log('SoulSyncConnect UI loaded - Ready for backend integration');
+    </script>
+
+    <style>
+        .nav-item {
+            @apply text-gray-700 hover:bg-gray-100 hover:text-gray-900;
+        }
+        
+        .nav-item.active {
+            @apply bg-primary text-white hover:bg-primary-dark hover:text-white;
+        }
+        
+        .content-section {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+    </style>
+</body>
+</html>
