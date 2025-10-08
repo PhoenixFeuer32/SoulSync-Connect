@@ -49,7 +49,7 @@ export function initializeSession(
   sessions.set(callSid, newSession);
 
   Logger.info('ai-voice', 'Session initialized', { callSid, companionId: companion.id });
-  Logger.debug('ai-voice', 'Session details', {
+  (Logger.debug as any)('ai-voice', 'Session details', {
     voiceId: newSession.voiceId,
     hasElevenlabsKey: !!newSession.elevenlabsApiKey,
     hasKindroidKey: !!newSession.kindroidApiKey,
@@ -75,7 +75,7 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
 
   try {
     // Call Kindroid API
-    Logger.debug('ai-voice', 'Calling Kindroid API', { callSid, botId: session.kindroidBotId, message: userMessage.substring(0, 50) });
+    (Logger.debug as any)('ai-voice', 'Calling Kindroid API', { callSid, botId: session.kindroidBotId, message: userMessage.substring(0, 50) });
     const response = await fetch(`${process.env.KINDROID_API_URL}/chat`, {
       method: 'POST',
       headers: {
@@ -134,7 +134,7 @@ export async function speakResponse(callSid: string, text: string): Promise<void
   }
 
   try {
-    Logger.debug('ai-voice', 'Calling ElevenLabs TTS', { callSid, textLength: text.length, voiceId: session.voiceId });
+    (Logger.debug as any)('ai-voice', 'Calling ElevenLabs TTS', { callSid, textLength: text.length, voiceId: session.voiceId });
     // Get audio from ElevenLabs
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${session.voiceId}`, {
       method: 'POST',
@@ -160,7 +160,7 @@ export async function speakResponse(callSid: string, text: string): Promise<void
     }
 
     const audioBuffer = await response.buffer();
-    Logger.debug('ai-voice', 'ElevenLabs audio buffer received', { callSid, audioSize: audioBuffer.length });
+    (Logger.debug as any)('ai-voice', 'ElevenLabs audio buffer received', { callSid, audioSize: audioBuffer.length });
 
     // Convert to base64 for Twilio
     const audioPayload = audioBuffer.toString('base64');
@@ -281,7 +281,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             streamSid: data.start.streamSid
           });
 
-          Logger.debug('ai-voice', 'Initializing Deepgram live transcription', { callSid });
+          (Logger.debug as any)('ai-voice', 'Initializing Deepgram live transcription', { callSid });
           // Start Deepgram live transcription
           deepgramLive = deepgram.listen.live({
             model: 'nova-2',
@@ -360,7 +360,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           if (deepgramLive && data.media?.payload) {
             const audioData = Buffer.from(data.media.payload, 'base64');
             deepgramLive.send(audioData);
-            // Logger.debug('ai-voice', 'Forwarded audio to Deepgram', { callSid, payloadSize: audioData.length }); // Too verbose for production
+            // (Logger.debug as any)('ai-voice', 'Forwarded audio to Deepgram', { callSid, payloadSize: audioData.length }); // Too verbose for production
           }
           break;
 

@@ -837,7 +837,7 @@ async function ensureDefaultUser() {
   const mediaStreamWss = new WebSocketServer({ noServer: true });
 
   httpServer.on('upgrade', (request, socket, head) => {
-    Logger.debug('twilio', `HTTP upgrade request received for URL: ${request.url}`);
+    (Logger.debug as any)('twilio', `HTTP upgrade request received for URL: ${request.url}`);
     if (request.url === '/webhooks/twilio/media-stream') {
       mediaStreamWss.handleUpgrade(request, socket, head, (ws) => {
         mediaStreamWss.emit('connection', ws, request);
@@ -865,7 +865,7 @@ async function ensureDefaultUser() {
             streamSid: data.start.streamSid,
             companionId: customParameters?.companionId
           });
-          Logger.debug('twilio', 'Media stream custom parameters', { customParameters });
+          (Logger.debug as any)('twilio', 'Media stream custom parameters', { customParameters });
 
           // Initialize AI session if companion is configured
           if (customParameters?.companionId) {
@@ -873,7 +873,7 @@ async function ensureDefaultUser() {
             const companion = companions.find(c => c.id === customParameters.companionId);
 
             if (companion && process.env.ELEVENLABS_API_KEY && process.env.KINDROID_API_KEY && process.env.DEEPGRAM_API_KEY) {
-              Logger.debug('twilio', 'All AI services configured, initializing session', { callSid, companionId: companion.id });
+              (Logger.debug as any)('twilio', 'All AI services configured, initializing session', { callSid, companionId: companion.id });
               initializeSession(
                 callSid,
                 companion,
