@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import fetch from 'node-fetch';
 import { Logger } from './logger.js';
+import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 
 interface KindroidMessage {
   role: 'user' | 'assistant';
@@ -15,6 +16,11 @@ interface ConversationSession {
   elevenlabsApiKey: string;
   conversationHistory: KindroidMessage[];
   callSid: string;
+  deepgramConnection?: any;
+  twilioWs?: WebSocket;
+  streamSid?: string;
+  isProcessing: boolean;
+  audioBuffer: string[];
 }
 
 const sessions = new Map<string, ConversationSession>();
@@ -22,7 +28,13 @@ const sessions = new Map<string, ConversationSession>();
 /**
  * Initialize a conversation session for a call
  */
-export function initializeSession(callSid: string, companion: any, elevenlabsApiKey: string, kindroidApiKey: string) {
+export function initializeSession(
+  callSid: string,
+  companion: any,
+  elevenlabsApiKey: string,
+  kindroidApiKey: string,
+  deepgramApiKey: string
+) {
   sessions.set(callSid, {
     companionId: companion.id,
     kindroidBotId: companion.kindroidBotId,
@@ -31,6 +43,8 @@ export function initializeSession(callSid: string, companion: any, elevenlabsApi
     elevenlabsApiKey,
     conversationHistory: [],
     callSid,
+    isProcessing: false,
+    audioBuffer: [],
   });
 
   Logger.info('ai-voice', 'Session initialized', { callSid, companionId: companion.id });
@@ -68,7 +82,8 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
     });
 
     if (!response.ok) {
-      throw new Error(`Kindroid API error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`Kindroid API error: ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json() as { response: string };
@@ -94,16 +109,18 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
 }
 
 /**
- * Convert text to speech using ElevenLabs
+ * Convert text to speech using ElevenLabs and send to Twilio
  */
-export async function textToSpeech(callSid: string, text: string): Promise<Buffer> {
+export async function speakResponse(callSid: string, text: string): Promise<void> {
   const session = sessions.get(callSid);
 
-  if (!session) {
-    throw new Error('Session not found');
+  if (!session || !session.twilioWs || !session.streamSid) {
+    Logger.error('ai-voice', 'Cannot speak - session or connection not ready');
+    return;
   }
 
   try {
+    // Get audio from ElevenLabs
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${session.voiceId}`, {
       method: 'POST',
       headers: {
@@ -116,7 +133,8 @@ export async function textToSpeech(callSid: string, text: string): Promise<Buffe
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75
-        }
+        },
+        output_format: 'ulaw_8000' // Twilio expects μ-law at 8kHz
       })
     });
 
@@ -126,16 +144,62 @@ export async function textToSpeech(callSid: string, text: string): Promise<Buffe
 
     const audioBuffer = await response.buffer();
 
-    Logger.info('ai-voice', 'Text-to-speech generated', {
+    // Convert to base64 for Twilio
+    const audioPayload = audioBuffer.toString('base64');
+
+    // Send audio to Twilio Media Stream
+    const mediaMessage = {
+      event: 'media',
+      streamSid: session.streamSid,
+      media: {
+        payload: audioPayload
+      }
+    };
+
+    session.twilioWs.send(JSON.stringify(mediaMessage));
+
+    Logger.info('ai-voice', 'Audio sent to Twilio', {
       callSid,
       textLength: text.length,
       audioSize: audioBuffer.length
     });
-
-    return audioBuffer;
   } catch (error) {
-    Logger.error('ai-voice', 'Text-to-speech failed', error as Error);
-    throw error;
+    Logger.error('ai-voice', 'Failed to speak response', error as Error);
+  }
+}
+
+/**
+ * Process user speech and respond
+ */
+async function processUserSpeech(callSid: string, transcript: string) {
+  const session = sessions.get(callSid);
+
+  if (!session || session.isProcessing) {
+    return;
+  }
+
+  session.isProcessing = true;
+
+  try {
+    Logger.info('ai-voice', 'Processing user speech', { callSid, transcript });
+
+    // Get AI response from Kindroid
+    const aiResponse = await getAIResponse(callSid, transcript);
+
+    // Convert to speech and send back
+    await speakResponse(callSid, aiResponse);
+
+  } catch (error) {
+    Logger.error('ai-voice', 'Failed to process user speech', error as Error);
+
+    // Send error message
+    try {
+      await speakResponse(callSid, "I'm sorry, I'm having trouble understanding right now.");
+    } catch (e) {
+      // Ignore
+    }
+  } finally {
+    session.isProcessing = false;
   }
 }
 
@@ -146,6 +210,15 @@ export function endSession(callSid: string) {
   const session = sessions.get(callSid);
 
   if (session) {
+    // Close Deepgram connection if exists
+    if (session.deepgramConnection) {
+      try {
+        session.deepgramConnection.finish();
+      } catch (e) {
+        // Ignore
+      }
+    }
+
     Logger.info('ai-voice', 'Session ended', {
       callSid,
       messageCount: session.conversationHistory.length
@@ -155,39 +228,88 @@ export function endSession(callSid: string) {
 }
 
 /**
- * Handle incoming audio stream from Twilio Media Streams
+ * Handle incoming audio stream from Twilio Media Streams with Deepgram STT
  */
-export function handleMediaStream(ws: WebSocket, callSid: string) {
+export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey: string) {
+  const session = sessions.get(callSid);
+
+  if (!session) {
+    Logger.error('ai-voice', 'Session not found for media stream', { callSid });
+    return;
+  }
+
+  session.twilioWs = ws;
   Logger.info('ai-voice', 'Media stream connected', { callSid });
+
+  // Initialize Deepgram client
+  const deepgram = createClient(deepgramApiKey);
+
+  let deepgramLive: any = null;
 
   ws.on('message', async (message: string) => {
     try {
       const data = JSON.parse(message);
 
-      // Handle different Twilio Media Stream events
       switch (data.event) {
         case 'start':
-          Logger.info('ai-voice', 'Stream started', { callSid, streamSid: data.start.streamSid });
+          session.streamSid = data.start.streamSid;
+          Logger.info('ai-voice', 'Stream started', {
+            callSid,
+            streamSid: data.start.streamSid
+          });
+
+          // Start Deepgram live transcription
+          deepgramLive = deepgram.listen.live({
+            model: 'nova-2',
+            language: 'en-US',
+            smart_format: true,
+            encoding: 'mulaw',
+            sample_rate: 8000,
+            channels: 1,
+            interim_results: false,
+          });
+
+          // Handle transcription results
+          deepgramLive.on(LiveTranscriptionEvents.Transcript, (data: any) => {
+            const transcript = data.channel?.alternatives?.[0]?.transcript;
+
+            if (transcript && transcript.trim().length > 0) {
+              Logger.info('ai-voice', 'Transcript received', {
+                callSid,
+                transcript
+              });
+
+              // Process the speech
+              processUserSpeech(callSid, transcript);
+            }
+          });
+
+          deepgramLive.on(LiveTranscriptionEvents.Error, (error: any) => {
+            Logger.error('ai-voice', 'Deepgram error', error);
+          });
+
+          session.deepgramConnection = deepgramLive;
+
+          // Send initial greeting
+          setTimeout(async () => {
+            await speakResponse(callSid, `Hello! I'm ready to talk. How can I help you today?`);
+          }, 500);
+
           break;
 
         case 'media':
-          // This contains the incoming audio from the caller
-          // In a full implementation, you would:
-          // 1. Buffer the audio chunks
-          // 2. Use speech-to-text (e.g., Google Speech-to-Text or Deepgram)
-          // 3. Send transcript to getAIResponse()
-          // 4. Convert AI response to speech with textToSpeech()
-          // 5. Send audio back through the stream
-
-          // For now, log that we're receiving audio
-          Logger.debug('ai-voice', 'Received audio chunk', {
-            callSid,
-            payloadSize: data.media.payload.length
-          });
+          // Forward audio to Deepgram
+          if (deepgramLive && data.media?.payload) {
+            const audioData = Buffer.from(data.media.payload, 'base64');
+            deepgramLive.send(audioData);
+          }
           break;
 
         case 'stop':
           Logger.info('ai-voice', 'Stream stopped', { callSid });
+          if (deepgramLive) {
+            deepgramLive.finish();
+          }
           endSession(callSid);
           break;
       }
@@ -198,6 +320,9 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
 
   ws.on('close', () => {
     Logger.info('ai-voice', 'Media stream closed', { callSid });
+    if (deepgramLive) {
+      deepgramLive.finish();
+    }
     endSession(callSid);
   });
 

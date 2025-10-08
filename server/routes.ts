@@ -369,7 +369,8 @@ async function ensureDefaultUser() {
       const hasAIConfigured = activeCompanion.kindroidBotId &&
                              activeCompanion.voiceId &&
                              process.env.ELEVENLABS_API_KEY &&
-                             process.env.KINDROID_API_KEY;
+                             process.env.KINDROID_API_KEY &&
+                             process.env.DEEPGRAM_API_KEY;
 
       if (hasAIConfigured) {
         // Use Media Streams for real-time AI conversation
@@ -868,18 +869,26 @@ async function ensureDefaultUser() {
             const companions = await storage.getCompanions("default-user");
             const companion = companions.find(c => c.id === customParameters.companionId);
 
-            if (companion && process.env.ELEVENLABS_API_KEY && process.env.KINDROID_API_KEY) {
+            if (companion && process.env.ELEVENLABS_API_KEY && process.env.KINDROID_API_KEY && process.env.DEEPGRAM_API_KEY) {
               initializeSession(
                 callSid,
                 companion,
                 process.env.ELEVENLABS_API_KEY,
-                process.env.KINDROID_API_KEY
+                process.env.KINDROID_API_KEY,
+                process.env.DEEPGRAM_API_KEY
               );
+
+              // Handle the media stream with Deepgram
+              handleMediaStream(ws, callSid, process.env.DEEPGRAM_API_KEY);
+            } else {
+              Logger.warn('twilio', 'AI services not fully configured', {
+                hasCompanion: !!companion,
+                hasElevenLabs: !!process.env.ELEVENLABS_API_KEY,
+                hasKindroid: !!process.env.KINDROID_API_KEY,
+                hasDeepgram: !!process.env.DEEPGRAM_API_KEY
+              });
             }
           }
-
-          // Handle the media stream
-          handleMediaStream(ws, callSid);
         }
       } catch (error) {
         Logger.error('twilio', 'Media stream message error', error as Error);
