@@ -55,22 +55,22 @@ export class Logger {
     }
   }
 
-  static async error(service: string, message: string, error?: Error, userId?: string) {
+  static async error(service: string, message: any, error?: Error, userId?: string) {
     await this.log('error', service, message, { 
       error: error?.message, 
       stack: error?.stack 
     }, userId);
   }
 
-  static async warn(service: string, message: string, metadata?: any, userId?: string) {
+  static async warn(service: string, message: any, metadata?: any, userId?: string) {
     await this.log('warn', service, message, metadata, userId);
   }
 
-  static async info(service: string, message: string, metadata?: any, userId?: string) {
+  static async info(service: string, message: any, metadata?: any, userId?: string) {
     await this.log('info', service, message, metadata, userId);
   }
 
-  static async debug(service: string, message: string, metadata?: any, userId?: string) {
+  static async debug(service: string, message: any, metadata?: any, userId?: string) {
     await this.log('debug', service, message, metadata, userId);
   }
 }
