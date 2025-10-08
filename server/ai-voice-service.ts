@@ -210,6 +210,11 @@ export function endSession(callSid: string) {
   const session = sessions.get(callSid);
 
   if (session) {
+    // Clear keep-alive interval
+    if ((session as any).keepAliveInterval) {
+      clearInterval((session as any).keepAliveInterval);
+    }
+
     // Close Deepgram connection if exists
     if (session.deepgramConnection) {
       try {
@@ -292,8 +297,34 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
 
           // Send initial greeting
           setTimeout(async () => {
-            await speakResponse(callSid, `Hello! I'm ready to talk. How can I help you today?`);
-          }, 500);
+            try {
+              await speakResponse(callSid, `Hello! I'm ready to talk. How can I help you today?`);
+            } catch (error) {
+              Logger.error('ai-voice', 'Failed to send initial greeting', error as Error);
+            }
+          }, 1000);
+
+          // Send keep-alive marks to prevent timeout
+          const keepAliveInterval = setInterval(() => {
+            if (session.twilioWs && session.streamSid) {
+              try {
+                session.twilioWs.send(JSON.stringify({
+                  event: 'mark',
+                  streamSid: session.streamSid,
+                  mark: {
+                    name: 'keepalive'
+                  }
+                }));
+              } catch (e) {
+                clearInterval(keepAliveInterval);
+              }
+            } else {
+              clearInterval(keepAliveInterval);
+            }
+          }, 10000); // Every 10 seconds
+
+          // Store interval for cleanup
+          (session as any).keepAliveInterval = keepAliveInterval;
 
           break;
 
