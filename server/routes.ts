@@ -843,7 +843,7 @@ async function ensureDefaultUser() {
         mediaStreamWss.emit('connection', ws, request);
       });
     } else {
-      Logger.warn('twilio', 'Unhandled HTTP upgrade request', new Error('Unhandled upgrade request'), { url: request.url });
+      Logger.warn('twilio', `Unhandled HTTP upgrade request for URL: ${request.url}`, { error: new Error('Unhandled upgrade request') });
       socket.destroy();
     }
   });
