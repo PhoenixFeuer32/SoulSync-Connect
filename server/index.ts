@@ -71,10 +71,8 @@ app.use((req, res, next) => {
   // so the service accepts external traffic from the host environment.
   const port = parseInt(process.env.PORT || '5000', 10);
 
-  server.listen({
-    port,
-    host: process.env.HOST_BIND || "0.0.0.0",
-  }, () => {
+  server.listen(port, process.env.HOST_BIND || "0.0.0.0", () => {
+    console.log(`🚀 Server listening on ${process.env.HOST_BIND || "0.0.0.0"}:${port}`);
     log(`serving on port ${port}`);
   });
 })();
