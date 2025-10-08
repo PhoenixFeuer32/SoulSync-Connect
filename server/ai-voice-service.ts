@@ -234,7 +234,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
   const session = sessions.get(callSid);
 
   if (!session) {
-    Logger.error('ai-voice', 'Session not found for media stream', { callSid });
+    Logger.error('ai-voice', `Session not found for media stream: ${callSid}`, new Error('Session not found'));
     return;
   }
 
