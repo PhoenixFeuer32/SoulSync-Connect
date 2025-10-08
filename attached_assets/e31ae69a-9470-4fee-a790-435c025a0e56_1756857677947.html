@@ -1,0 +1,483 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kindroid Voice Companion - Call & Connect</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: {
+                    'inter': ['Inter', 'sans-serif'],
+                },
+                colors: {
+                    'primary': {
+                        50: '#E3F2FD',
+                        500: '#1976D2',
+                        600: '#1565C0',
+                        700: '#0D47A1',
+                    },
+                    'secondary': {
+                        500: '#424242',
+                        600: '#212121',
+                    }
+                }
+            }
+        }
+    };
+    </script>
+</head>
+<body class="font-inter bg-gray-50">
+    <!-- @COMPONENT: MainLayout [Main application container] -->
+    <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        
+        <!-- Header -->
+        <!-- @COMPONENT: Header [Application header with title and status] -->
+        <header class="bg-white shadow-sm border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-phone-alt text-primary-500 text-2xl"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-900">Kindroid Voice Companion</h1>
+                            <p class="text-sm text-gray-500">Connect & Call Your AI Companions</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <!-- @STATE: connectionStatus:string = 'disconnected' -->
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-red-400 rounded-full animate-pulse"></div>
+                            <span class="text-sm text-gray-600" data-bind="connectionStatus">Disconnected</span>
+                        </div>
+                        <button class="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                            <i class="fas fa-cog mr-2"></i>Settings
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <!-- @END_COMPONENT: Header -->
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- Left Column: Credentials & Configuration -->
+                <div class="lg:col-span-1 space-y-6">
+                    
+                    <!-- @COMPONENT: CredentialsPanel [API credentials management] -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center mb-6">
+                            <i class="fas fa-key text-primary-500 mr-3"></i>
+                            <h2 class="text-lg font-semibold text-gray-900">API Credentials</h2>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Kindroid API Key</label>
+                                <div class="relative">
+                                    <input type="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Enter your Kindroid API key" data-mock="true">
+                                    <button class="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
+                                        <i class="fas fa-eye text-sm"></i>
+                                    </button>
+                                </div>
+                                <div class="mt-2 flex items-center">
+                                    <div class="w-2 h-2 bg-red-400 rounded-full mr-2"></div>
+                                    <span class="text-xs text-gray-500">Not validated</span>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Eleven Labs API Key</label>
+                                <div class="relative">
+                                    <input type="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Enter Eleven Labs API key" data-mock="true">
+                                    <button class="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
+                                        <i class="fas fa-eye text-sm"></i>
+                                    </button>
+                                </div>
+                                <div class="mt-2 flex items-center">
+                                    <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                                    <span class="text-xs text-gray-500">Validated</span>
+                                </div>
+                            </div>
+                            
+                            <div class="border-t pt-4">
+                                <h3 class="text-sm font-medium text-gray-700 mb-3">Twilio Credentials</h3>
+                                <div class="space-y-3">
+                                    <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Account SID" data-mock="true">
+                                    <input type="password" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Auth Token" data-mock="true">
+                                </div>
+                            </div>
+                            
+                            <div class="border-t pt-4">
+                                <h3 class="text-sm font-medium text-gray-700 mb-3">Spotify API</h3>
+                                <div class="space-y-3">
+                                    <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Client ID" data-mock="true">
+                                    <input type="password" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Client Secret" data-mock="true">
+                                </div>
+                            </div>
+                            
+                            <button class="w-full bg-primary-500 hover:bg-primary-600 text-white py-3 rounded-lg font-medium transition-colors" data-event="click:validateCredentials">
+                                <i class="fas fa-check mr-2"></i>Validate All Credentials
+                            </button>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: CredentialsPanel -->
+                    
+                    <!-- @COMPONENT: CompanionSelector [Companion and voice selection] -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center mb-6">
+                            <i class="fas fa-robot text-primary-500 mr-3"></i>
+                            <h2 class="text-lg font-semibold text-gray-900">Companion Settings</h2>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Kindroid Bot ID</label>
+                                <input type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Enter bot ID" data-bind="selectedBotId" data-mock="true">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Voice Selection</label>
+                                <select class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" data-bind="selectedVoiceId">
+                                    <option data-mock="true">Select voice...</option>
+                                    <option data-mock="true">Rachel (Female, American)</option>
+                                    <option data-mock="true">Josh (Male, American)</option>
+                                    <option data-mock="true">Bella (Female, British)</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Eleven Labs Voice ID</label>
+                                <input type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Custom voice ID" data-bind="customVoiceId" data-mock="true">
+                            </div>
+                            
+                            <button class="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-medium transition-colors" data-event="click:updateCompanion">
+                                <i class="fas fa-sync mr-2"></i>Update Companion
+                            </button>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: CompanionSelector -->
+                </div>
+                
+                <!-- Center Column: Call Interface -->
+                <div class="lg:col-span-1">
+                    <!-- @COMPONENT: CallInterface [Main calling interface] -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+                        <div class="mb-8">
+                            <!-- Animated companion avatar with modern geometric design -->
+                            <div class="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center shadow-lg">
+                                <i class="fas fa-robot text-white text-4xl"></i>
+                            </div>
+                            
+                            <div>
+                                <h3 class="text-xl font-semibold text-gray-900 mb-2" data-bind="companionName">AI Companion</h3>
+                                <p class="text-sm text-gray-500" data-bind="companionStatus">Ready to connect</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Call Status Indicator -->
+                        <!-- @STATE: callStatus:string = 'idle' -->
+                        <div class="mb-8">
+                            <div class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-600" data-bind="callStatus">
+                                <div class="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
+                                Idle
+                            </div>
+                        </div>
+                        
+                        <!-- Call Controls -->
+                        <div class="space-y-4">
+                            <button class="w-full bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-medium text-lg transition-colors shadow-md hover:shadow-lg" data-event="click:initiateCall">
+                                <i class="fas fa-phone mr-3"></i>Start Call
+                            </button>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <button class="bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-medium transition-colors" data-event="click:muteCall">
+                                    <i class="fas fa-microphone-slash mr-2"></i>Mute
+                                </button>
+                                <button class="bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-medium transition-colors" data-event="click:endCall">
+                                    <i class="fas fa-phone-slash mr-2"></i>End
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Call Duration -->
+                        <div class="mt-8 pt-6 border-t border-gray-100">
+                            <div class="text-center">
+                                <div class="text-2xl font-mono font-bold text-gray-900" data-bind="callDuration">00:00:00</div>
+                                <div class="text-sm text-gray-500">Call Duration</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: CallInterface -->
+                    
+                    <!-- File Sharing -->
+                    <!-- @COMPONENT: FileSharing [File upload and sharing interface] -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
+                        <div class="flex items-center mb-4">
+                            <i class="fas fa-share text-primary-500 mr-3"></i>
+                            <h3 class="text-lg font-semibold text-gray-900">File Sharing</h3>
+                        </div>
+                        
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors cursor-pointer" data-event="click:openFilePicker">
+                            <i class="fas fa-cloud-upload-alt text-gray-400 text-3xl mb-4"></i>
+                            <p class="text-sm text-gray-600 mb-2">Drop files here or click to upload</p>
+                            <p class="text-xs text-gray-400">Share files with your companion</p>
+                        </div>
+                        
+                        <!-- File List -->
+                        <div class="mt-4 space-y-2">
+                            <!-- @MAP: uploadedFiles.map(file => ( -->
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg" data-mock="true">
+                                <div class="flex items-center">
+                                    <i class="fas fa-file text-gray-400 mr-3"></i>
+                                    <span class="text-sm text-gray-700">document.pdf</span>
+                                </div>
+                                <button class="text-primary-500 hover:text-primary-600 text-sm">Send</button>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: FileSharing -->
+                </div>
+                
+                <!-- Right Column: Features & Diagnostics -->
+                <div class="lg:col-span-1 space-y-6">
+                    
+                    <!-- Spotify Integration -->
+                    <!-- @COMPONENT: SpotifyIntegration [Spotify music features] -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center mb-6">
+                            <i class="fab fa-spotify text-green-500 mr-3 text-xl"></i>
+                            <h2 class="text-lg font-semibold text-gray-900">Spotify Integration</h2>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                                <div class="flex items-center">
+                                    <div class="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                                    <span class="text-sm text-gray-700">Connected to Spotify</span>
+                                </div>
+                                <i class="fas fa-check text-green-500"></i>
+                            </div>
+                            
+                            <div class="border-t pt-4">
+                                <h4 class="text-sm font-medium text-gray-700 mb-3">Music Recommendations</h4>
+                                <div class="space-y-2">
+                                    <!-- @MAP: recommendations.map(song => ( -->
+                                    <div class="flex items-center p-3 bg-gray-50 rounded-lg" data-mock="true">
+                                        <!-- Album artwork from Unsplash -->
+                                        <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=64&h=64" alt="Album artwork" class="w-12 h-12 rounded mr-3">
+                                        <div class="flex-1">
+                                            <div class="text-sm font-medium text-gray-900">Song Title</div>
+                                            <div class="text-xs text-gray-500">Artist Name</div>
+                                        </div>
+                                        <button class="text-green-500 hover:text-green-600">
+                                            <i class="fas fa-plus text-sm"></i>
+                                        </button>
+                                    </div>
+                                    <!-- @END_MAP )) -->
+                                </div>
+                            </div>
+                            
+                            <button class="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-medium transition-colors" data-event="click:askForRecommendations">
+                                <i class="fas fa-music mr-2"></i>Ask Companion for Music
+                            </button>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: SpotifyIntegration -->
+                    
+                    <!-- Diagnostics Dashboard -->
+                    <!-- @COMPONENT: DiagnosticsDashboard [System monitoring and diagnostics] -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <div class="flex items-center">
+                                <i class="fas fa-chart-line text-primary-500 mr-3"></i>
+                                <h2 class="text-lg font-semibold text-gray-900">System Diagnostics</h2>
+                            </div>
+                            <button class="text-primary-500 hover:text-primary-600 text-sm font-medium">
+                                <i class="fas fa-refresh mr-1"></i>Refresh
+                            </button>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <!-- API Status Grid -->
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="p-3 border border-green-200 bg-green-50 rounded-lg">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-medium text-green-700">Kindroid API</span>
+                                        <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    </div>
+                                    <div class="text-lg font-semibold text-green-800 mt-1" data-bind="kindroidLatency">142ms</div>
+                                </div>
+                                
+                                <div class="p-3 border border-green-200 bg-green-50 rounded-lg">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-medium text-green-700">Eleven Labs</span>
+                                        <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    </div>
+                                    <div class="text-lg font-semibold text-green-800 mt-1" data-bind="elevenLabsLatency">89ms</div>
+                                </div>
+                                
+                                <div class="p-3 border border-yellow-200 bg-yellow-50 rounded-lg">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-medium text-yellow-700">Twilio</span>
+                                        <div class="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                                    </div>
+                                    <div class="text-lg font-semibold text-yellow-800 mt-1" data-bind="twilioLatency">203ms</div>
+                                </div>
+                                
+                                <div class="p-3 border border-green-200 bg-green-50 rounded-lg">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-xs font-medium text-green-700">Spotify</span>
+                                        <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    </div>
+                                    <div class="text-lg font-semibold text-green-800 mt-1" data-bind="spotifyLatency">76ms</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Error Monitoring -->
+                            <div class="border-t pt-4">
+                                <h4 class="text-sm font-medium text-gray-700 mb-3">Recent Errors</h4>
+                                <div class="space-y-2 max-h-32 overflow-y-auto">
+                                    <!-- @MAP: recentErrors.map(error => ( -->
+                                    <div class="flex items-start p-2 bg-red-50 rounded text-xs" data-mock="true">
+                                        <i class="fas fa-exclamation-triangle text-red-500 mr-2 mt-0.5"></i>
+                                        <div>
+                                            <div class="font-medium text-red-700">Webhook timeout</div>
+                                            <div class="text-red-600">12:34:56 PM</div>
+                                        </div>
+                                    </div>
+                                    <!-- @END_MAP )) -->
+                                </div>
+                            </div>
+                            
+                            <!-- Webhook Status -->
+                            <div class="border-t pt-4">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-700">Webhook Status</span>
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                        <span class="text-xs text-green-600">Active</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: DiagnosticsDashboard -->
+                    
+                    <!-- Quick Actions -->
+                    <!-- @COMPONENT: QuickActions [Utility buttons and shortcuts] -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                        <div class="grid grid-cols-1 gap-3">
+                            <button class="flex items-center justify-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" data-event="click:testConnection">
+                                <i class="fas fa-plug mr-3 text-primary-500"></i>
+                                <span class="text-sm font-medium text-gray-700">Test All Connections</span>
+                            </button>
+                            
+                            <button class="flex items-center justify-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" data-event="click:clearLogs">
+                                <i class="fas fa-broom mr-3 text-yellow-500"></i>
+                                <span class="text-sm font-medium text-gray-700">Clear Diagnostic Logs</span>
+                            </button>
+                            
+                            <button class="flex items-center justify-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" data-event="click:exportSettings">
+                                <i class="fas fa-download mr-3 text-blue-500"></i>
+                                <span class="text-sm font-medium text-gray-700">Export Configuration</span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: QuickActions -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: MainLayout -->
+
+    <script>
+    (function() {
+        'use strict';
+        
+        // TODO: Implement WebSocket connections for real-time audio streaming
+        // TODO: Implement API client initialization with user-provided credentials  
+        // TODO: Implement Spotify API integration for song search and recommendations
+        // TODO: Implement file upload interface with companion integration
+        // TODO: Implement real-time speech-to-text via Kindroid API
+        // TODO: Implement text-to-speech via Twilio with Eleven Labs voice integration
+        // TODO: Implement comprehensive webhook error logging and monitoring
+        // TODO: Implement credential validation and testing functionality
+        
+        // Placeholder for demonstration purposes
+        const app = {
+            connectionStatus: 'disconnected',
+            callStatus: 'idle',
+            callDuration: '00:00:00',
+            
+            // Mock data for visual demonstration
+            selectedBotId: '',
+            selectedVoiceId: '',
+            customVoiceId: '',
+            companionName: 'AI Companion',
+            companionStatus: 'Ready to connect',
+            
+            // Diagnostic data
+            kindroidLatency: '142ms',
+            elevenLabsLatency: '89ms', 
+            twilioLatency: '203ms',
+            spotifyLatency: '76ms'
+        };
+        
+        // Event handlers for UI interaction (placeholders)
+        document.addEventListener('click', function(e) {
+            const target = e.target.closest('[data-event]');
+            if (!target) return;
+            
+            const event = target.getAttribute('data-event');
+            console.log('Event triggered:', event);
+            
+            // TODO: Implement actual event handling logic
+            switch(event.split(':')[1]) {
+                case 'validateCredentials':
+                    console.log('Validating API credentials...');
+                    break;
+                case 'updateCompanion':
+                    console.log('Updating companion settings...');
+                    break;
+                case 'initiateCall':
+                    console.log('Starting call...');
+                    break;
+                case 'endCall':
+                    console.log('Ending call...');
+                    break;
+                case 'muteCall':
+                    console.log('Toggling mute...');
+                    break;
+                case 'openFilePicker':
+                    console.log('Opening file picker...');
+                    break;
+                case 'askForRecommendations':
+                    console.log('Requesting music recommendations...');
+                    break;
+                case 'testConnection':
+                    console.log('Testing all connections...');
+                    break;
+                case 'clearLogs':
+                    console.log('Clearing diagnostic logs...');
+                    break;
+                case 'exportSettings':
+                    console.log('Exporting configuration...');
+                    break;
+            }
+        });
+        
+        console.log('Kindroid Voice Companion app initialized');
+    })();
+    </script>
+</body>
+</html>

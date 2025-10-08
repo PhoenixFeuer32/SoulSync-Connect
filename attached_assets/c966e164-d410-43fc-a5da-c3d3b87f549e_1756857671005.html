@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kindroid Voice Companion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    primary: '#5865F2',
+                    secondary: '#4F545C',
+                    background: '#2F3136',
+                    surface: '#36393F',
+                    success: '#3BA55C',
+                    error: '#ED4245',
+                    warning: '#FAA61A',
+                    muted: '#B9BBBE'
+                },
+                fontFamily: {
+                    'sans': ['Inter', 'system-ui', 'sans-serif']
+                }
+            }
+        }
+    };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-background text-white font-sans min-h-screen">
+    <!-- @COMPONENT: MainLayout -->
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <!-- @COMPONENT: Sidebar -->
+        <div class="w-80 bg-surface flex flex-col">
+            <!-- Header -->
+            <div class="p-6 border-b border-secondary">
+                <h1 class="text-xl font-bold text-white">Kindroid Voice</h1>
+                <p class="text-sm text-muted">AI Companion Calling</p>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 p-4 space-y-2">
+                <button data-event="click:switchTab" data-implementation="Switch to call tab" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-primary text-white font-medium">
+                    <i class="fas fa-phone w-5 h-5"></i>
+                    <span>Call Interface</span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to companions tab" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted hover:text-white hover:bg-background transition-colors">
+                    <i class="fas fa-robot w-5 h-5"></i>
+                    <span>Companions</span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to settings tab" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted hover:text-white hover:bg-background transition-colors">
+                    <i class="fas fa-cog w-5 h-5"></i>
+                    <span>Settings</span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to files tab" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted hover:text-white hover:bg-background transition-colors">
+                    <i class="fas fa-folder w-5 h-5"></i>
+                    <span>File Share</span>
+                </button>
+                
+                <button data-event="click:switchTab" data-implementation="Switch to diagnostics tab" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-muted hover:text-white hover:bg-background transition-colors">
+                    <i class="fas fa-chart-line w-5 h-5"></i>
+                    <span>Diagnostics</span>
+                </button>
+            </nav>
+
+            <!-- Current Companion -->
+            <div class="p-4 border-t border-secondary">
+                <div class="flex items-center space-x-3 mb-3">
+                    <!-- AI companion avatar placeholder -->
+                    <div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
+                        <i class="fas fa-robot text-white text-lg"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-medium text-white" data-bind="currentCompanion.name">Luna</p>
+                        <p class="text-xs text-muted" data-bind="currentCompanion.status">Online</p>
+                    </div>
+                    <div class="w-3 h-3 rounded-full bg-success" data-bind="currentCompanion.isOnline"></div>
+                </div>
+                
+                <div class="text-xs text-muted space-y-1">
+                    <div class="flex justify-between">
+                        <span>Voice:</span>
+                        <span data-bind="currentVoice.name">Sarah</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>API Status:</span>
+                        <span class="text-success" data-bind="apiStatus">Connected</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: Sidebar -->
+
+        <!-- Main Content -->
+        <!-- @COMPONENT: MainContent -->
+        <div class="flex-1 flex flex-col">
+            <!-- Call Interface Tab -->
+            <div id="call-interface" class="flex-1 flex flex-col">
+                <!-- Header -->
+                <header class="bg-surface p-6 border-b border-secondary">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold text-white">Voice Call</h2>
+                            <p class="text-muted">Connect with your AI companion</p>
+                        </div>
+                        
+                        <!-- Call Status -->
+                        <!-- @STATE: callStatus:string = 'idle' -->
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 rounded-full bg-muted" data-bind="callStatus.indicator"></div>
+                                <span class="text-sm text-muted" data-bind="callStatus.text">Ready to call</span>
+                            </div>
+                            
+                            <!-- Call Duration -->
+                            <div class="text-sm text-muted" data-bind="callDuration" style="display: none;">
+                                <i class="fas fa-clock mr-1"></i>
+                                <span>00:00</span>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Call Interface -->
+                <div class="flex-1 flex items-center justify-center p-8">
+                    <div class="text-center space-y-8">
+                        <!-- Companion Avatar -->
+                        <div class="relative">
+                            <div class="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center mx-auto">
+                                <i class="fas fa-robot text-white text-4xl"></i>
+                            </div>
+                            <!-- Audio visualization -->
+                            <div class="absolute inset-0 rounded-full border-4 border-primary opacity-0 animate-ping" data-bind="isCallActive"></div>
+                        </div>
+
+                        <!-- Companion Name -->
+                        <div>
+                            <h3 class="text-2xl font-bold text-white mb-2" data-bind="currentCompanion.name">Luna</h3>
+                            <p class="text-muted" data-bind="currentCompanion.description">Your friendly AI companion</p>
+                        </div>
+
+                        <!-- Audio Controls -->
+                        <div class="flex items-center justify-center space-x-6">
+                            <!-- Mute Button -->
+                            <button data-event="click:toggleMute" data-implementation="Toggle microphone mute" class="w-16 h-16 rounded-full bg-surface hover:bg-secondary text-white transition-colors flex items-center justify-center">
+                                <i class="fas fa-microphone text-xl" data-bind="isMuted ? 'fa-microphone-slash' : 'fa-microphone'"></i>
+                            </button>
+
+                            <!-- Call Button -->
+                            <button data-event="click:toggleCall" data-implementation="Start or end call with companion" class="w-20 h-20 rounded-full bg-success hover:bg-green-600 text-white transition-colors flex items-center justify-center call-button" data-call-active="false">
+                                <i class="fas fa-phone text-2xl"></i>
+                            </button>
+
+                            <!-- Volume Button -->
+                            <button data-event="click:toggleVolume" data-implementation="Adjust speaker volume" class="w-16 h-16 rounded-full bg-surface hover:bg-secondary text-white transition-colors flex items-center justify-center">
+                                <i class="fas fa-volume-up text-xl"></i>
+                            </button>
+                        </div>
+
+                        <!-- Quick Actions -->
+                        <div class="flex items-center justify-center space-x-4">
+                            <button data-event="click:openFileShare" data-implementation="Open file sharing interface" class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg font-medium transition-colors">
+                                <i class="fas fa-share mr-2"></i>
+                                Share File
+                            </button>
+                            
+                            <button data-event="click:openSpotify" data-implementation="Open Spotify integration" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors">
+                                <i class="fab fa-spotify mr-2"></i>
+                                Play Music
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-time Audio Visualizer -->
+                <div class="bg-surface p-4 border-t border-secondary" data-bind="isCallActive">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-sm text-muted">Audio Activity</span>
+                        <div class="flex items-center space-x-2 text-xs text-muted">
+                            <span>Quality: HD</span>
+                            <span>•</span>
+                            <span data-bind="audioQuality.latency">12ms</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Audio visualization bars -->
+                    <div class="flex items-end justify-center space-x-1 h-12">
+                        <!-- @MAP: Array.from({length: 20}).map((_, i) => ( -->
+                        <div class="w-2 bg-primary rounded-t" style="height: 20%" data-implementation="Animate based on audio input"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 40%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 60%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 30%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 80%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 50%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 70%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 90%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 60%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 40%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 80%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 30%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 60%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 45%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 75%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 55%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 35%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 65%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 25%"></div>
+                        <div class="w-2 bg-primary rounded-t" style="height: 45%"></div>
+                        <!-- @END_MAP -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: MainContent -->
+
+        <!-- Settings Panel (Hidden by default) -->
+        <!-- @COMPONENT: SettingsPanel -->
+        <div class="w-96 bg-surface border-l border-secondary hidden" id="settings-panel">
+            <div class="p-6 border-b border-secondary">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-white">Settings</h3>
+                    <button data-event="click:closeSettings" class="text-muted hover:text-white">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-6 space-y-6 overflow-y-auto flex-1">
+                <!-- Companion Settings -->
+                <div class="space-y-4">
+                    <h4 class="font-semibold text-white">Companion</h4>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-muted mb-2">Bot ID</label>
+                        <input 
+                            type="text" 
+                            placeholder="Enter Kindroid bot ID"
+                            data-bind="companionSettings.botId"
+                            data-implementation="Validate and update companion ID"
+                            class="w-full px-3 py-2 bg-background border border-secondary rounded-lg text-white placeholder-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                        />
+                    </div>
+
+                    <button data-event="click:updateCompanion" data-implementation="Update companion with new bot ID" class="w-full px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg font-medium transition-colors">
+                        Update Companion
+                    </button>
+                </div>
+
+                <!-- Voice Settings -->
+                <div class="space-y-4 pt-6 border-t border-secondary">
+                    <h4 class="font-semibold text-white">Voice</h4>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-muted mb-2">Eleven Labs Voice ID</label>
+                        <input 
+                            type="text" 
+                            placeholder="Enter voice ID"
+                            data-bind="voiceSettings.voiceId"
+                            data-implementation="Validate and update voice ID"
+                            class="w-full px-3 py-2 bg-background border border-secondary rounded-lg text-white placeholder-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-muted mb-2">Voice Speed</label>
+                        <input 
+                            type="range" 
+                            min="0.5" 
+                            max="2" 
+                            step="0.1" 
+                            value="1"
+                            data-bind="voiceSettings.speed"
+                            class="w-full"
+                        />
+                        <div class="flex justify-between text-xs text-muted mt-1">
+                            <span>0.5x</span>
+                            <span>1x</span>
+                            <span>2x</span>
+                        </div>
+                    </div>
+
+                    <button data-event="click:testVoice" data-implementation="Test current voice settings" class="w-full px-4 py-2 bg-secondary hover:bg-gray-600 text-white rounded-lg font-medium transition-colors">
+                        Test Voice
+                    </button>
+                </div>
+
+                <!-- API Credentials -->
+                <div class="space-y-4 pt-6 border-t border-secondary">
+                    <h4 class="font-semibold text-white">API Credentials</h4>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-muted mb-2">Kindroid API Key</label>
+                        <input 
+                            type="password" 
+                            placeholder="Enter API key"
+                            data-bind="credentials.kindroidApiKey"
+                            data-implementation="Securely store Kindroid API key"
+                            class="w-full px-3 py-2 bg-background border border-secondary rounded-lg text-white placeholder-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-muted mb-2">Eleven Labs API Key</label>
+                        <input 
+                            type="password" 
+                            placeholder="Enter API key"
+                            data-bind="credentials.elevenLabsApiKey"
+                            data-implementation="Securely store Eleven Labs API key"
+                            class="w-full px-3 py-2 bg-background border border-secondary rounded-lg text-white placeholder-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-muted mb-2">Twilio Account SID</label>
+                        <input 
+                            type="text" 
+                            placeholder="Enter Account SID"
+                            data-bind="credentials.twilioAccountSid"
+                            data-implementation="Securely store Twilio Account SID"
+                            class="w-full px-3 py-2 bg-background border border-secondary rounded-lg text-white placeholder-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                        />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-muted mb-2">Twilio Auth Token</label>
+                        <input 
+                            type="password" 
+                            placeholder="Enter Auth Token"
+                            data-bind="credentials.twilioAuthToken"
+                            data-implementation="Securely store Twilio Auth Token"
+                            class="w-full px-3 py-2 bg-background border border-secondary rounded-lg text-white placeholder-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                        />
+                    </div>
+
+                    <button data-event="click:validateCredentials" data-implementation="Test all API credentials" class="w-full px-4 py-2 bg-warning hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors">
+                        Validate Credentials
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- @END_COMPONENT: SettingsPanel -->
+    </div>
+    <!-- @END_COMPONENT: MainLayout -->
+
+    <!-- File Share Modal -->
+    <!-- @COMPONENT: FileShareModal -->
+    <div class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" id="file-share-modal">
+        <div class="bg-surface rounded-xl p-6 w-96 max-w-full mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-white">Share File</h3>
+                <button data-event="click:closeModal" class="text-muted hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- File Upload Area -->
+            <div class="border-2 border-dashed border-secondary rounded-lg p-8 text-center mb-6">
+                <i class="fas fa-cloud-upload-alt text-3xl text-muted mb-3"></i>
+                <p class="text-muted mb-2">Drop files here or click to browse</p>
+                <input type="file" class="hidden" id="file-input" data-implementation="Handle file selection and upload">
+                <button data-event="click:triggerFileSelect" class="text-primary hover:text-blue-400">Choose Files</button>
+            </div>
+
+            <!-- Selected Files -->
+            <div class="space-y-2 mb-6" id="selected-files" style="display: none;">
+                <h4 class="font-medium text-white">Selected Files</h4>
+                <!-- @MAP: selectedFiles.map(file => ( -->
+                <div class="flex items-center justify-between bg-background rounded-lg p-3">
+                    <div class="flex items-center space-x-3">
+                        <i class="fas fa-file text-muted"></i>
+                        <span class="text-white" data-bind="file.name">document.pdf</span>
+                        <span class="text-xs text-muted" data-bind="file.size">1.2 MB</span>
+                    </div>
+                    <button data-event="click:removeFile" class="text-error hover:text-red-400">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <!-- @END_MAP -->
+            </div>
+
+            <!-- Share Options -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-muted mb-2">Message (Optional)</label>
+                    <textarea 
+                        placeholder="Add a message with your file..."
+                        data-bind="fileShare.message"
+                        rows="3"
+                        class="w-full px-3 py-2 bg-background border border-secondary rounded-lg text-white placeholder-muted focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-none"
+                    ></textarea>
+                </div>
+
+                <div class="flex space-x-3">
+                    <button data-event="click:cancelFileShare" class="flex-1 px-4 py-2 bg-secondary hover:bg-gray-600 text-white rounded-lg font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button data-event="click:shareFile" data-implementation="Share file with selected companion" class="flex-1 px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg font-medium transition-colors">
+                        Share
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: FileShareModal -->
+
+    <!-- Diagnostics Dashboard (Hidden by default) -->
+    <!-- @COMPONENT: DiagnosticsDashboard -->
+    <div class="fixed inset-0 bg-background hidden z-40" id="diagnostics-dashboard">
+        <div class="h-full flex flex-col">
+            <header class="bg-surface p-6 border-b border-secondary">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">System Diagnostics</h2>
+                        <p class="text-muted">Real-time monitoring and error tracking</p>
+                    </div>
+                    <button data-event="click:closeDiagnostics" class="text-muted hover:text-white">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div class="flex-1 p-6 overflow-y-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    <!-- API Status Cards -->
+                    <div class="bg-surface rounded-xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-semibold text-white">Kindroid API</h3>
+                            <div class="w-3 h-3 rounded-full bg-success" data-bind="kindroidApi.status"></div>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-muted">Response Time:</span>
+                                <span class="text-white" data-bind="kindroidApi.responseTime">142ms</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-muted">Requests Today:</span>
+                                <span class="text-white" data-bind="kindroidApi.requestsToday">1,247</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-muted">Error Rate:</span>
+                                <span class="text-success" data-bind="kindroidApi.errorRate">0.2%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-surface rounded-xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-semibold text-white">Eleven Labs</h3>
+                            <div class="w-3 h-3 rounded-full bg-success" data-bind="elevenLabs.status"></div>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-muted">Response Time:</span>
+                                <span class="text-white" data-bind="elevenLabs.responseTime">89ms</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-muted">Characters Used:</span>
+                                <span class="text-white" data-bind="elevenLabs.charactersUsed">45,231</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-muted">Error Rate:</span>
+                                <span class="text-success" data-bind="elevenLabs.errorRate">0.1%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-surface rounded-xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-semibold text-white">Twilio</h3>
+                            <div class="w-3 h-3 rounded-full bg-success" data-bind="twilio.status"></div>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-muted">Connection:</span>
+                                <span class="text-success" data-bind="twilio.connection">Stable</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-muted">Call Quality:</span>
+                                <span class="text-white" data-bind="twilio.callQuality">HD</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-muted">Latency:</span>
+                                <span class="text-success" data-bind="twilio.latency">12ms</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Logs -->
+                <div class="bg-surface rounded-xl p-6 mb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-white">Recent Errors</h3>
+                        <button data-event="click:clearErrors" class="text-error hover:text-red-400 text-sm">
+                            Clear All
+                        </button>
+                    </div>
+                    
+                    <div class="space-y-3 max-h-80 overflow-y-auto">
+                        <!-- @MAP: recentErrors.map(error => ( -->
+                        <div class="flex items-start space-x-3 p-3 bg-background rounded-lg">
+                            <div class="w-2 h-2 rounded-full bg-error mt-2"></div>
+                            <div class="flex-1">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="font-medium text-white" data-bind="error.service">Kindroid API</span>
+                                    <span class="text-xs text-muted" data-bind="error.timestamp">2 minutes ago</span>
+                                </div>
+                                <p class="text-sm text-muted" data-bind="error.message">Connection timeout - retrying in 5 seconds</p>
+                                <div class="flex items-center space-x-4 mt-2 text-xs text-muted">
+                                    <span data-bind="error.code">ERR_TIMEOUT</span>
+                                    <span>•</span>
+                                    <span data-bind="error.endpoint">/api/v1/companion/chat</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- @END_MAP -->
+                        
+                        <!-- Placeholder when no errors -->
+                        <div class="text-center py-8 text-muted" data-bind="hasNoErrors">
+                            <i class="fas fa-check-circle text-3xl text-success mb-3"></i>
+                            <p>No errors detected</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-surface rounded-xl p-6">
+                        <h3 class="font-semibold text-white mb-4">Response Times (24h)</h3>
+                        <div class="h-48 flex items-end justify-between space-x-1">
+                            <!-- @FUNCTIONALITY: This should implement a real-time chart showing API response times -->
+                            <!-- Placeholder chart bars -->
+                            <!-- @MAP: Array.from({length: 24}).map((_, i) => ( -->
+                            <div class="flex-1 bg-primary rounded-t opacity-70" style="height: 60%" data-bind="responseTimeData[i]"></div>
+                            <!-- @END_MAP -->
+                        </div>
+                        <div class="flex justify-between text-xs text-muted mt-2">
+                            <span>00:00</span>
+                            <span>12:00</span>
+                            <span>24:00</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-surface rounded-xl p-6">
+                        <h3 class="font-semibold text-white mb-4">API Usage (24h)</h3>
+                        <div class="h-48 flex items-end justify-between space-x-1">
+                            <!-- @FUNCTIONALITY: This should implement a real-time chart showing API usage -->
+                            <!-- Placeholder chart bars -->
+                            <!-- @MAP: Array.from({length: 24}).map((_, i) => ( -->
+                            <div class="flex-1 bg-success rounded-t opacity-70" style="height: 40%" data-bind="usageData[i]"></div>
+                            <!-- @END_MAP -->
+                        </div>
+                        <div class="flex justify-between text-xs text-muted mt-2">
+                            <span>00:00</span>
+                            <span>12:00</span>
+                            <span>24:00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: DiagnosticsDashboard -->
+
+    <!-- Toast Notifications -->
+    <!-- @COMPONENT: ToastNotifications -->
+    <div class="fixed top-4 right-4 z-50 space-y-3" id="toast-container">
+        <!-- @MAP: notifications.map(notification => ( -->
+        <div class="bg-surface border-l-4 border-success rounded-lg p-4 shadow-lg max-w-sm transform translate-x-0 opacity-100 transition-all duration-300" data-bind="notification.type" style="display: none;">
+            <div class="flex items-start space-x-3">
+                <i class="fas fa-check-circle text-success mt-1" data-bind="notification.icon"></i>
+                <div class="flex-1">
+                    <p class="font-medium text-white" data-bind="notification.title">Success</p>
+                    <p class="text-sm text-muted" data-bind="notification.message">Operation completed successfully</p>
+                </div>
+                <button data-event="click:dismissNotification" class="text-muted hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <!-- @END_MAP -->
+    </div>
+    <!-- @END_COMPONENT: ToastNotifications -->
+
+    <script>
+    (function() {
+        // TODO: Implement business logic, API calls, and state management
+        
+        // Mock state management
+        let appState = {
+            currentCompanion: { name: 'Luna', status: 'Online', isOnline: true },
+            currentVoice: { name: 'Sarah' },
+            callStatus: { text: 'Ready to call', indicator: 'idle' },
+            isCallActive: false,
+            isMuted: false,
+            credentials: {},
+            selectedFiles: []
+        };
+
+        // Mock event handlers
+        function handleCallToggle() {
+            const callButton = document.querySelector('.call-button');
+            const isActive = callButton.getAttribute('data-call-active') === 'true';
+            
+            if (isActive) {
+                // End call
+                callButton.classList.remove('bg-error', 'hover:bg-red-600');
+                callButton.classList.add('bg-success', 'hover:bg-green-600');
+                callButton.innerHTML = '<i class="fas fa-phone text-2xl"></i>';
+                callButton.setAttribute('data-call-active', 'false');
+                
+                // Hide audio visualizer
+                const visualizer = document.querySelector('[data-bind="isCallActive"]');
+                if (visualizer) visualizer.style.display = 'none';
+            } else {
+                // Start call
+                callButton.classList.remove('bg-success', 'hover:bg-green-600');
+                callButton.classList.add('bg-error', 'hover:bg-red-600');
+                callButton.innerHTML = '<i class="fas fa-phone-slash text-2xl"></i>';
+                callButton.setAttribute('data-call-active', 'true');
+                
+                // Show audio visualizer
+                const visualizer = document.querySelector('[data-bind="isCallActive"]');
+                if (visualizer) visualizer.style.display = 'block';
+                
+                // TODO: Implement actual call logic with Twilio
+                console.log('Starting call with companion:', appState.currentCompanion.name);
+            }
+        }
+
+        function showModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function hideModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function showDiagnostics() {
+            document.getElementById('diagnostics-dashboard').classList.remove('hidden');
+        }
+
+        function hideDiagnostics() {
+            document.getElementById('diagnostics-dashboard').classList.add('hidden');
+        }
+
+        // Event listeners
+        document.addEventListener('click', function(e) {
+            const target = e.target.closest('button');
+            if (!target) return;
+
+            const event = target.getAttribute('data-event');
+            
+            switch(event) {
+                case 'click:toggleCall':
+                    handleCallToggle();
+                    break;
+                case 'click:openFileShare':
+                    showModal('file-share-modal');
+                    break;
+                case 'click:closeModal':
+                    hideModal('file-share-modal');
+                    break;
+                case 'click:switchTab':
+                    const tabName = target.textContent.trim();
+                    if (tabName === 'Diagnostics') {
+                        showDiagnostics();
+                    }
+                    break;
+                case 'click:closeDiagnostics':
+                    hideDiagnostics();
+                    break;
+                default:
+                    console.log('Event:', event, 'Implementation needed');
+            }
+        });
+
+        // Mock audio visualization animation
+        function animateAudioBars() {
+            const bars = document.querySelectorAll('[data-bind="isCallActive"] .w-2');
+            bars.forEach(bar => {
+                const height = Math.random() * 90 + 10;
+                bar.style.height = height + '%';
+                bar.style.opacity = Math.random() * 0.5 + 0.5;
+            });
+        }
+
+        // Start audio visualization when call is active
+        setInterval(() => {
+            const callButton = document.querySelector('.call-button');
+            if (callButton && callButton.getAttribute('data-call-active') === 'true') {
+                animateAudioBars();
+            }
+        }, 100);
+
+        // Mock credential validation
+        function validateCredentials() {
+            // TODO: Implement actual credential validation
+            console.log('Validating API credentials...');
+            
+            // Show mock success notification
+            setTimeout(() => {
+                const notification = document.querySelector('#toast-container > div');
+                if (notification) {
+                    notification.style.display = 'block';
+                    
+                    // Hide after 3 seconds
+                    setTimeout(() => {
+                        notification.style.display = 'none';
+                    }, 3000);
+                }
+            }, 1000);
+        }
+
+        // Initialize app
+        console.log('Kindroid Voice Companion initialized');
+        console.log('Ready for local development deployment');
+    })();
+    </script>
+</body>
+</html>
