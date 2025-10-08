@@ -2,6 +2,7 @@ services:
   - type: web
     name: soulsync-connect
     env: node
+    region: oregon
     rootDirectory: .
     buildCommand: npm install && npm run build
     startCommand: npm start
