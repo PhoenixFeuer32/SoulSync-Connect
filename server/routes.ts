@@ -375,17 +375,27 @@ async function ensureDefaultUser() {
       if (hasAIConfigured) {
         // Use Media Streams for real-time AI conversation
         const hostUrl = `${req.protocol}://${req.get('host')}`;
+        const streamUrl = `wss://${req.get('host')}/webhooks/twilio/media-stream`;
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Joanna">Hello! Connecting you to ${activeCompanion.name}.</Say>
   <Connect>
-    <Stream url="wss://${req.get('host')}/webhooks/twilio/media-stream">
+    <Stream url="${streamUrl}">
       <Parameter name="callSid" value="${CallSid}" />
       <Parameter name="companionId" value="${activeCompanion.id}" />
     </Stream>
   </Connect>
   <Say voice="Polly.Joanna">The call has ended. Thank you for using SoulSync!</Say>
 </Response>`;
+
+        Logger.info('twilio', 'Sending TwiML with Media Stream', {
+          callSid: CallSid,
+          streamUrl,
+          companionId: activeCompanion.id,
+          hasElevenLabs: !!process.env.ELEVENLABS_API_KEY,
+          hasKindroid: !!process.env.KINDROID_API_KEY,
+          hasDeepgram: !!process.env.DEEPGRAM_API_KEY
+        });
 
         res.type('text/xml');
         res.send(twiml);
@@ -837,9 +847,19 @@ async function ensureDefaultUser() {
   const mediaStreamWss = new WebSocketServer({ noServer: true });
 
   httpServer.on('upgrade', (request, socket, head) => {
-    Logger.debug('twilio', `HTTP upgrade request received for URL: ${request.url}`);
+    Logger.info('twilio', `HTTP upgrade request received`, {
+      url: request.url,
+      headers: {
+        upgrade: request.headers.upgrade,
+        connection: request.headers.connection,
+        host: request.headers.host
+      }
+    });
+
     if (request.url === '/webhooks/twilio/media-stream') {
+      Logger.info('twilio', 'Accepting media stream WebSocket upgrade');
       mediaStreamWss.handleUpgrade(request, socket, head, (ws) => {
+        Logger.info('twilio', 'Media stream WebSocket upgraded successfully');
         mediaStreamWss.emit('connection', ws, request);
       });
     } else {
