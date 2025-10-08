@@ -863,6 +863,7 @@ async function ensureDefaultUser() {
             streamSid: data.start.streamSid,
             companionId: customParameters?.companionId
           });
+          Logger.debug('twilio', 'Media stream custom parameters', { customParameters });
 
           // Initialize AI session if companion is configured
           if (customParameters?.companionId) {
@@ -870,6 +871,7 @@ async function ensureDefaultUser() {
             const companion = companions.find(c => c.id === customParameters.companionId);
 
             if (companion && process.env.ELEVENLABS_API_KEY && process.env.KINDROID_API_KEY && process.env.DEEPGRAM_API_KEY) {
+              Logger.debug('twilio', 'All AI services configured, initializing session', { callSid, companionId: companion.id });
               initializeSession(
                 callSid,
                 companion,
@@ -882,12 +884,15 @@ async function ensureDefaultUser() {
               handleMediaStream(ws, callSid, process.env.DEEPGRAM_API_KEY);
             } else {
               Logger.warn('twilio', 'AI services not fully configured', {
+                error: 'AI services not fully configured',
                 hasCompanion: !!companion,
                 hasElevenLabs: !!process.env.ELEVENLABS_API_KEY,
                 hasKindroid: !!process.env.KINDROID_API_KEY,
                 hasDeepgram: !!process.env.DEEPGRAM_API_KEY
               });
             }
+          } else {
+            Logger.warn('twilio', 'No companion ID provided in custom parameters for media stream', { callSid, customParameters, error: 'No companion ID' });
           }
         }
       } catch (error) {
