@@ -14,7 +14,7 @@ import path from "path";
 import fs from "fs/promises";
 import fetch from "node-fetch"; // Lets you make HTTP requests from Node.js
 import { eq, and } from "drizzle-orm";
-import { handleTwilioMediaStreamWebSocket } from "./ai-voice-service.js";
+import { handleMediaStream, initializeSession } from "./ai-voice-service.js";
 
 const galaxyApiKey = process.env.GALAXY_THEME_API_KEY;
 const windowsApiKey = process.env.WINDOWS_THEME_API_KEY;
@@ -847,7 +847,53 @@ async function ensureDefaultUser() {
   });
 
   mediaStreamWss.on('connection', async (ws, request) => {
-    handleTwilioMediaStreamWebSocket(ws);
+    Logger.info('twilio', 'Media stream WebSocket connected');
+
+    // Extract parameters from the initial Twilio connection
+    ws.on('message', async (message: string) => {
+      try {
+        const data = JSON.parse(message);
+
+        if (data.event === 'start') {
+          const callSid = data.start.callSid;
+          const customParameters = data.start.customParameters;
+
+          Logger.info('twilio', 'Media stream started', {
+            callSid,
+            streamSid: data.start.streamSid,
+            companionId: customParameters?.companionId
+          });
+
+          // Initialize AI session if companion is configured
+          if (customParameters?.companionId) {
+            const companions = await storage.getCompanions("default-user");
+            const companion = companions.find(c => c.id === customParameters.companionId);
+
+            if (companion && process.env.ELEVENLABS_API_KEY && process.env.KINDROID_API_KEY && process.env.DEEPGRAM_API_KEY) {
+              initializeSession(
+                callSid,
+                companion,
+                process.env.ELEVENLABS_API_KEY,
+                process.env.KINDROID_API_KEY,
+                process.env.DEEPGRAM_API_KEY
+              );
+
+              // Handle the media stream with Deepgram
+              handleMediaStream(ws, callSid, process.env.DEEPGRAM_API_KEY);
+            } else {
+              Logger.warn('twilio', 'AI services not fully configured', {
+                hasCompanion: !!companion,
+                hasElevenLabs: !!process.env.ELEVENLABS_API_KEY,
+                hasKindroid: !!process.env.KINDROID_API_KEY,
+                hasDeepgram: !!process.env.DEEPGRAM_API_KEY
+              });
+            }
+          }
+        }
+      } catch (error) {
+        Logger.error('twilio', 'Media stream message error', error as Error);
+      }
+    });
   });
 
   return httpServer;
