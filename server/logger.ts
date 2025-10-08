@@ -22,7 +22,7 @@ const logger = winston.createLogger({
 });
 
 export class Logger {
-  static async log(level: 'error' | 'warn' | 'info' | 'debug', service: string, message: string, metadata?: any, userId?: string) {
+  static async log(level: 'error' | 'warn' | 'info' | 'debug', service: string, message: any, metadata?: any, userId?: string) {
     // Log to Winston
     logger.log(level, message, { service, metadata, userId });
     
