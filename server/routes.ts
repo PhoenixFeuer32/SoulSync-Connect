@@ -878,19 +878,12 @@ async function ensureDefaultUser() {
         socketReadable: socket.readable,
         socketWritable: socket.writable,
         socketDestroyed: socket.destroyed,
-        socketBufferSize: socket.bufferSize,
         socketPending: (socket as any).pending
       });
 
-      // Try calling handleUpgrade synchronously without try-catch to see actual error
+      // Set a timeout to detect if callback is never called
       const timeoutId = setTimeout(() => {
-        Logger.error('twilio', 'handleUpgrade callback timeout - callback was never called after 5 seconds', new Error('Upgrade timeout'), {
-          socketState: {
-            readable: socket.readable,
-            writable: socket.writable,
-            destroyed: socket.destroyed
-          }
-        });
+        Logger.error('twilio', 'handleUpgrade callback timeout - callback was never called after 5 seconds', new Error('Upgrade timeout'));
       }, 5000);
 
       mediaStreamWss.handleUpgrade(request, socket, head, (ws) => {
