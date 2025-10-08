@@ -866,14 +866,30 @@ async function ensureDefaultUser() {
     });
 
     if (request.url === '/webhooks/twilio/media-stream') {
-      Logger.info('twilio', 'Accepting media stream WebSocket upgrade');
+      Logger.info('twilio', 'Accepting media stream WebSocket upgrade', {
+        headLength: head.length,
+        socketReadable: socket.readable,
+        socketWritable: socket.writable,
+        socketDestroyed: socket.destroyed
+      });
+
+      // Set a timeout to detect if callback is never called
+      const timeoutId = setTimeout(() => {
+        Logger.error('twilio', 'handleUpgrade callback timeout - callback was never called after 5 seconds', new Error('Upgrade timeout'));
+      }, 5000);
+
       try {
         mediaStreamWss.handleUpgrade(request, socket, head, (ws) => {
+          clearTimeout(timeoutId);
           Logger.info('twilio', 'Media stream WebSocket upgraded successfully');
+          ws.on('error', (error) => {
+            Logger.error('twilio', 'WebSocket connection error', error as Error);
+          });
           mediaStreamWss.emit('connection', ws, request);
         });
         Logger.info('twilio', 'handleUpgrade called, waiting for callback');
       } catch (error) {
+        clearTimeout(timeoutId);
         Logger.error('twilio', 'Failed to upgrade media stream WebSocket', error as Error);
         socket.destroy();
       }
