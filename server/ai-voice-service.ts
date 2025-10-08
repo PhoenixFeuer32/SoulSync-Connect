@@ -123,8 +123,13 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
 export async function speakResponse(callSid: string, text: string): Promise<void> {
   const session = sessions.get(callSid);
 
-  if (!session || !session.twilioWs || !session.streamSid) {
-    Logger.error('ai-voice', `Cannot speak for call ${callSid} - session or connection not ready. TwilioWs: ${!!session.twilioWs}, StreamSid: ${!!session.streamSid}`, new Error('Session or connection not ready'));
+  if (!session) {
+    Logger.error('ai-voice', `Cannot speak for call ${callSid} - session not found.`, new Error('Session not found'));
+    return;
+  }
+
+  if (!session.twilioWs || !session.streamSid) {
+    Logger.error('ai-voice', `Cannot speak for call ${callSid} - Twilio WebSocket or stream SID not ready. TwilioWs: ${!!session.twilioWs}, StreamSid: ${!!session.streamSid}`, new Error('Twilio connection not ready'));
     return;
   }
 
