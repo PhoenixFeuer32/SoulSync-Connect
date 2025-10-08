@@ -837,11 +837,13 @@ async function ensureDefaultUser() {
   const mediaStreamWss = new WebSocketServer({ noServer: true });
 
   httpServer.on('upgrade', (request, socket, head) => {
+    Logger.debug('twilio', 'HTTP upgrade request received', { url: request.url });
     if (request.url === '/webhooks/twilio/media-stream') {
       mediaStreamWss.handleUpgrade(request, socket, head, (ws) => {
         mediaStreamWss.emit('connection', ws, request);
       });
     } else {
+      Logger.warn('twilio', 'Unhandled HTTP upgrade request', new Error('Unhandled upgrade request'), { url: request.url });
       socket.destroy();
     }
   });
