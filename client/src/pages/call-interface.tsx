@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useRealTimeData } from "@/hooks/use-real-time-data";
@@ -10,6 +12,7 @@ export default function CallInterface() {
   const [callDuration, setCallDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [phoneNumber, setPhoneNumber] = useState("");
   const { toast } = useToast();
   const { callStatus } = useRealTimeData();
 
@@ -18,13 +21,16 @@ export default function CallInterface() {
   });
 
   const startCallMutation = useMutation({
-    mutationFn: async (companionId: string) => {
+    mutationFn: async (data: { companionId: string; toPhoneNumber: string }) => {
       const response = await fetch("/api/calls/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companionId }),
+        body: JSON.stringify(data),
       });
-      if (!response.ok) throw new Error("Failed to start call");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to start call");
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -98,6 +104,22 @@ export default function CallInterface() {
               <h3 className="text-2xl font-bold mb-2">{activeCompanion.name}</h3>
               <p className="text-muted-foreground mb-6">{activeCompanion.description}</p>
 
+              {/* Phone Number Input */}
+              {!isCallActive && (
+                <div className="mb-6 max-w-sm mx-auto">
+                  <Label htmlFor="phone" className="text-left block mb-2">Phone Number to Call</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+1234567890"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="text-center text-lg"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">Include country code (e.g., +1 for US)</p>
+                </div>
+              )}
+
               {/* Call Duration */}
               {isCallActive && (
                 <div className="text-3xl font-mono font-bold text-chart-2 mb-6">
@@ -125,13 +147,26 @@ export default function CallInterface() {
               <div className="flex justify-center space-x-4">
                 {!isCallActive ? (
                   <Button
-                    onClick={() => startCallMutation.mutate(activeCompanion.id)}
-                    disabled={startCallMutation.isPending}
+                    onClick={() => {
+                      if (!phoneNumber) {
+                        toast({
+                          title: "Phone Number Required",
+                          description: "Please enter a phone number to call",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+                      startCallMutation.mutate({
+                        companionId: activeCompanion.id,
+                        toPhoneNumber: phoneNumber
+                      });
+                    }}
+                    disabled={startCallMutation.isPending || !phoneNumber}
                     className="bg-chart-2 hover:bg-chart-2/80 text-white px-8 py-4 text-lg"
                     data-testid="button-start-call"
                   >
                     <i className="fas fa-phone mr-2"></i>
-                    Start Call
+                    {startCallMutation.isPending ? "Calling..." : "Start Call"}
                   </Button>
                 ) : (
                   <>
