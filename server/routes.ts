@@ -14,6 +14,7 @@ import path from "path";
 import fs from "fs/promises";
 import fetch from "node-fetch"; // Lets you make HTTP requests from Node.js
 import { eq, and } from "drizzle-orm";
+import { handleMediaStream, initializeSession } from "./ai-voice-service.js";
 
 const galaxyApiKey = process.env.GALAXY_THEME_API_KEY;
 const windowsApiKey = process.env.WINDOWS_THEME_API_KEY;
@@ -364,18 +365,43 @@ async function ensureDefaultUser() {
 
       broadcast({ type: 'call_connected', data: callLog });
 
-      // Generate TwiML response
-      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      // Check if we have AI configured for this companion
+      const hasAIConfigured = activeCompanion.kindroidBotId &&
+                             activeCompanion.voiceId &&
+                             process.env.ELEVENLABS_API_KEY &&
+                             process.env.KINDROID_API_KEY;
+
+      if (hasAIConfigured) {
+        // Use Media Streams for real-time AI conversation
+        const hostUrl = `${req.protocol}://${req.get('host')}`;
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Joanna">Hello! Connecting you to ${activeCompanion.name}.</Say>
+  <Connect>
+    <Stream url="wss://${req.get('host')}/webhooks/twilio/media-stream">
+      <Parameter name="callSid" value="${CallSid}" />
+      <Parameter name="companionId" value="${activeCompanion.id}" />
+    </Stream>
+  </Connect>
+  <Say voice="Polly.Joanna">The call has ended. Thank you for using SoulSync!</Say>
+</Response>`;
+
+        res.type('text/xml');
+        res.send(twiml);
+      } else {
+        // Fallback to simple TTS message
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Joanna">Hello! You are now connected to ${activeCompanion.name}. This is a voice AI companion powered by SoulSync.</Say>
   <Pause length="1"/>
-  <Say voice="Polly.Joanna">The full AI voice integration with Eleven Labs and Kindroid is coming soon. For now, this is a test call.</Say>
+  <Say voice="Polly.Joanna">AI voice integration is not fully configured yet. Please add your Kindroid Bot ID and ElevenLabs Voice ID in the companion settings.</Say>
   <Pause length="2"/>
   <Say voice="Polly.Joanna">Thank you for using SoulSync. Goodbye!</Say>
 </Response>`;
 
-      res.type('text/xml');
-      res.send(twiml);
+        res.type('text/xml');
+        res.send(twiml);
+      }
     } catch (error) {
       Logger.error('twilio', 'Voice webhook failed', error as Error);
       res.status(500).send('<Response><Say>Error processing call</Say></Response>');
@@ -794,17 +820,72 @@ async function ensureDefaultUser() {
           unit: 'seconds'
         }
       ];
-      
+
       for (const metric of metrics) {
         await storage.createSystemMetric(metric);
       }
-      
+
       // Broadcast metrics to connected clients
       broadcast({ type: 'metrics_update', data: metrics });
     } catch (error) {
       Logger.error('system', 'Failed to collect metrics', error as Error);
     }
   }, 30000); // Every 30 seconds
+
+  // WebSocket endpoint for Twilio Media Streams
+  const mediaStreamWss = new WebSocketServer({ noServer: true });
+
+  httpServer.on('upgrade', (request, socket, head) => {
+    if (request.url === '/webhooks/twilio/media-stream') {
+      mediaStreamWss.handleUpgrade(request, socket, head, (ws) => {
+        mediaStreamWss.emit('connection', ws, request);
+      });
+    } else {
+      socket.destroy();
+    }
+  });
+
+  mediaStreamWss.on('connection', async (ws, request) => {
+    Logger.info('twilio', 'Media stream WebSocket connected');
+
+    // Extract parameters from the initial Twilio connection
+    ws.on('message', async (message: string) => {
+      try {
+        const data = JSON.parse(message);
+
+        if (data.event === 'start') {
+          const callSid = data.start.callSid;
+          const customParameters = data.start.customParameters;
+
+          Logger.info('twilio', 'Media stream started', {
+            callSid,
+            streamSid: data.start.streamSid,
+            companionId: customParameters?.companionId
+          });
+
+          // Initialize AI session if companion is configured
+          if (customParameters?.companionId) {
+            const companions = await storage.getCompanions("default-user");
+            const companion = companions.find(c => c.id === customParameters.companionId);
+
+            if (companion && process.env.ELEVENLABS_API_KEY && process.env.KINDROID_API_KEY) {
+              initializeSession(
+                callSid,
+                companion,
+                process.env.ELEVENLABS_API_KEY,
+                process.env.KINDROID_API_KEY
+              );
+            }
+          }
+
+          // Handle the media stream
+          handleMediaStream(ws, callSid);
+        }
+      } catch (error) {
+        Logger.error('twilio', 'Media stream message error', error as Error);
+      }
+    });
+  });
 
   return httpServer;
 }
