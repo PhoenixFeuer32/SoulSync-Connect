@@ -134,7 +134,7 @@ export async function speakResponse(callSid: string, text: string): Promise<void
   }
 
   try {
-    (Logger.debug as any)('ai-voice', 'Calling ElevenLabs TTS', { callSid, textLength: text.length, voiceId: session.voiceId });
+    Logger.info('ai-voice', 'Calling ElevenLabs TTS', { callSid, textLength: text.length, voiceId: session.voiceId });
     // Get audio from ElevenLabs
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${session.voiceId}`, {
       method: 'POST',
@@ -281,17 +281,23 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             streamSid: data.start.streamSid
           });
 
-          (Logger.debug as any)('ai-voice', 'Initializing Deepgram live transcription', { callSid });
+          Logger.info('ai-voice', 'Initializing Deepgram live transcription', { callSid });
           // Start Deepgram live transcription
-          deepgramLive = deepgram.listen.live({
-            model: 'nova-2',
-            language: 'en-US',
-            smart_format: true,
-            encoding: 'mulaw',
-            sample_rate: 8000,
-            channels: 1,
-            interim_results: false,
-          });
+          try {
+            deepgramLive = deepgram.listen.live({
+              model: 'nova-2',
+              language: 'en-US',
+              smart_format: true,
+              encoding: 'mulaw',
+              sample_rate: 8000,
+              channels: 1,
+              interim_results: false,
+            });
+            Logger.info('ai-voice', 'Deepgram live transcription object created', { callSid });
+          } catch (error) {
+            Logger.error('ai-voice', 'Failed to create Deepgram live connection', error as Error);
+            return;
+          }
 
           // Handle transcription results
           deepgramLive.on(LiveTranscriptionEvents.Transcript, (data: any) => {
@@ -325,7 +331,9 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           // Send initial greeting
           setTimeout(async () => {
             try {
+              Logger.info('ai-voice', 'Sending initial greeting', { callSid });
               await speakResponse(callSid, `Hello! I'm ready to talk. How can I help you today?`);
+              Logger.info('ai-voice', 'Initial greeting sent successfully', { callSid });
             } catch (error) {
               Logger.error('ai-voice', `Failed to send initial greeting for call ${callSid}`, error as Error);
             }
