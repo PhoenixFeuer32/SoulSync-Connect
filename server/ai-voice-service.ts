@@ -35,7 +35,7 @@ export function initializeSession(
   kindroidApiKey: string,
   deepgramApiKey: string
 ) {
-  sessions.set(callSid, {
+  const newSession: ConversationSession = {
     companionId: companion.id,
     kindroidBotId: companion.kindroidBotId,
     kindroidApiKey,
@@ -45,9 +45,16 @@ export function initializeSession(
     callSid,
     isProcessing: false,
     audioBuffer: [],
-  });
+  };
+  sessions.set(callSid, newSession);
 
   Logger.info('ai-voice', 'Session initialized', { callSid, companionId: companion.id });
+  Logger.debug('ai-voice', 'Session details', {
+    voiceId: newSession.voiceId,
+    hasElevenlabsKey: !!newSession.elevenlabsApiKey,
+    hasKindroidKey: !!newSession.kindroidApiKey,
+    hasDeepgramKey: !!deepgramApiKey,
+  });
 }
 
 /**
@@ -68,6 +75,7 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
 
   try {
     // Call Kindroid API
+    Logger.debug('ai-voice', 'Calling Kindroid API', { callSid, botId: session.kindroidBotId, message: userMessage.substring(0, 50) });
     const response = await fetch(`${process.env.KINDROID_API_URL}/chat`, {
       method: 'POST',
       headers: {
@@ -83,6 +91,7 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
 
     if (!response.ok) {
       const errorText = await response.text();
+      Logger.error('ai-voice', `Kindroid API error for call ${callSid}: ${response.statusText} - ${errorText}`, new Error(`Kindroid API error: ${response.statusText} - ${errorText}`));
       throw new Error(`Kindroid API error: ${response.statusText} - ${errorText}`);
     }
 
@@ -103,7 +112,7 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
 
     return aiResponse;
   } catch (error) {
-    Logger.error('ai-voice', 'Failed to get AI response', error as Error);
+    Logger.error('ai-voice', `Failed to get AI response for call ${callSid}`, error as Error);
     throw error;
   }
 }
@@ -115,11 +124,12 @@ export async function speakResponse(callSid: string, text: string): Promise<void
   const session = sessions.get(callSid);
 
   if (!session || !session.twilioWs || !session.streamSid) {
-    Logger.error('ai-voice', 'Cannot speak - session or connection not ready');
+    Logger.error('ai-voice', `Cannot speak for call ${callSid} - session or connection not ready. TwilioWs: ${!!session.twilioWs}, StreamSid: ${!!session.streamSid}`, new Error('Session or connection not ready'));
     return;
   }
 
   try {
+    Logger.debug('ai-voice', 'Calling ElevenLabs TTS', { callSid, textLength: text.length, voiceId: session.voiceId });
     // Get audio from ElevenLabs
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${session.voiceId}`, {
       method: 'POST',
@@ -139,10 +149,13 @@ export async function speakResponse(callSid: string, text: string): Promise<void
     });
 
     if (!response.ok) {
-      throw new Error(`ElevenLabs API error: ${response.statusText}`);
+      const errorText = await response.text();
+      Logger.error('ai-voice', `ElevenLabs API error for call ${callSid}: ${response.statusText} - ${errorText}`, new Error(`ElevenLabs API error: ${response.statusText} - ${errorText}`));
+      throw new Error(`ElevenLabs API error: ${response.statusText} - ${errorText}`);
     }
 
     const audioBuffer = await response.buffer();
+    Logger.debug('ai-voice', 'ElevenLabs audio buffer received', { callSid, audioSize: audioBuffer.length });
 
     // Convert to base64 for Twilio
     const audioPayload = audioBuffer.toString('base64');
@@ -164,7 +177,7 @@ export async function speakResponse(callSid: string, text: string): Promise<void
       audioSize: audioBuffer.length
     });
   } catch (error) {
-    Logger.error('ai-voice', 'Failed to speak response', error as Error);
+    Logger.error('ai-voice', `Failed to speak response for call ${callSid}`, error as Error);
   }
 }
 
@@ -190,7 +203,7 @@ async function processUserSpeech(callSid: string, transcript: string) {
     await speakResponse(callSid, aiResponse);
 
   } catch (error) {
-    Logger.error('ai-voice', 'Failed to process user speech', error as Error);
+    Logger.error('ai-voice', `Failed to process user speech for call ${callSid}`, error as Error);
 
     // Send error message
     try {
@@ -263,6 +276,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             streamSid: data.start.streamSid
           });
 
+          Logger.debug('ai-voice', 'Initializing Deepgram live transcription', { callSid });
           // Start Deepgram live transcription
           deepgramLive = deepgram.listen.live({
             model: 'nova-2',
@@ -290,7 +304,15 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           });
 
           deepgramLive.on(LiveTranscriptionEvents.Error, (error: any) => {
-            Logger.error('ai-voice', 'Deepgram error', error);
+            Logger.error('ai-voice', `Deepgram error for call ${callSid}`, error);
+          });
+
+          deepgramLive.on(LiveTranscriptionEvents.Open, () => {
+            Logger.info('ai-voice', 'Deepgram connection opened', { callSid });
+          });
+
+          deepgramLive.on(LiveTranscriptionEvents.Close, () => {
+            Logger.info('ai-voice', 'Deepgram connection closed', { callSid });
           });
 
           session.deepgramConnection = deepgramLive;
@@ -300,7 +322,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             try {
               await speakResponse(callSid, `Hello! I'm ready to talk. How can I help you today?`);
             } catch (error) {
-              Logger.error('ai-voice', 'Failed to send initial greeting', error as Error);
+              Logger.error('ai-voice', `Failed to send initial greeting for call ${callSid}`, error as Error);
             }
           }, 1000);
 
@@ -333,6 +355,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           if (deepgramLive && data.media?.payload) {
             const audioData = Buffer.from(data.media.payload, 'base64');
             deepgramLive.send(audioData);
+            // Logger.debug('ai-voice', 'Forwarded audio to Deepgram', { callSid, payloadSize: audioData.length }); // Too verbose for production
           }
           break;
 
@@ -345,7 +368,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           break;
       }
     } catch (error) {
-      Logger.error('ai-voice', 'Media stream error', error as Error);
+      Logger.error('ai-voice', `Media stream error for call ${callSid}`, error as Error);
     }
   });
 
@@ -358,6 +381,6 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
   });
 
   ws.on('error', (error) => {
-    Logger.error('ai-voice', 'Media stream WebSocket error', error as Error);
+    Logger.error('ai-voice', `Media stream WebSocket error for call ${callSid}`, error as Error);
   });
 }
