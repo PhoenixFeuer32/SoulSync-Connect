@@ -21,23 +21,25 @@ export default function CallInterface() {
   });
 
   const startCallMutation = useMutation({
-    mutationFn: async (data: { companionId: string; toPhoneNumber: string }) => {
+    mutationFn: async (companionId: string) => {
       const response = await fetch("/api/calls/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ companionId }),
       });
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to start call");
+        throw new Error(errorData.error || "Failed to prepare for call");
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setPhoneNumber(data.phoneNumber);
       setIsCallActive(true);
       toast({
-        title: "Call Connected",
-        description: "Successfully connected to companion",
+        title: "Ready for Calls",
+        description: `Call ${data.phoneNumber} to connect with ${data.companionName}`,
+        duration: 10000,
       });
     },
   });
@@ -104,19 +106,14 @@ export default function CallInterface() {
               <h3 className="text-2xl font-bold mb-2">{activeCompanion.name}</h3>
               <p className="text-muted-foreground mb-6">{activeCompanion.description}</p>
 
-              {/* Phone Number Input */}
-              {!isCallActive && (
-                <div className="mb-6 max-w-sm mx-auto">
-                  <Label htmlFor="phone" className="text-left block mb-2">Phone Number to Call</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+1234567890"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="text-center text-lg"
-                  />
-                  <p className="text-xs text-muted-foreground mt-2">Include country code (e.g., +1 for US)</p>
+              {/* Phone Number Display */}
+              {isCallActive && phoneNumber && (
+                <div className="mb-6 max-w-md mx-auto bg-primary/10 border-2 border-primary rounded-lg p-4">
+                  <Label className="text-sm font-medium mb-2 block">Call This Number:</Label>
+                  <div className="text-3xl font-bold text-primary mb-2">{phoneNumber}</div>
+                  <p className="text-sm text-muted-foreground">
+                    Dial from your phone to connect with {activeCompanion.name}
+                  </p>
                 </div>
               )}
 
@@ -147,26 +144,13 @@ export default function CallInterface() {
               <div className="flex justify-center space-x-4">
                 {!isCallActive ? (
                   <Button
-                    onClick={() => {
-                      if (!phoneNumber) {
-                        toast({
-                          title: "Phone Number Required",
-                          description: "Please enter a phone number to call",
-                          variant: "destructive"
-                        });
-                        return;
-                      }
-                      startCallMutation.mutate({
-                        companionId: activeCompanion.id,
-                        toPhoneNumber: phoneNumber
-                      });
-                    }}
-                    disabled={startCallMutation.isPending || !phoneNumber}
+                    onClick={() => startCallMutation.mutate(activeCompanion.id)}
+                    disabled={startCallMutation.isPending}
                     className="bg-chart-2 hover:bg-chart-2/80 text-white px-8 py-4 text-lg"
                     data-testid="button-start-call"
                   >
-                    <i className="fas fa-phone mr-2"></i>
-                    {startCallMutation.isPending ? "Calling..." : "Start Call"}
+                    <i className="fas fa-phone-volume mr-2"></i>
+                    {startCallMutation.isPending ? "Activating..." : "Activate for Incoming Calls"}
                   </Button>
                 ) : (
                   <>

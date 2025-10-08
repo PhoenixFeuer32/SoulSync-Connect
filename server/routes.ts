@@ -266,26 +266,16 @@ async function ensureDefaultUser() {
   // Call management endpoints
   app.post("/api/calls/start", async (req, res) => {
     try {
-      const { companionId, toPhoneNumber } = req.body;
+      const { companionId } = req.body;
 
-      if (!toPhoneNumber) {
-        return res.status(400).json({ error: 'Phone number is required' });
-      }
-
-      // Get Twilio credentials
-      const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
-      const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+      // Get Twilio phone number
       const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
-      if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
-        return res.status(500).json({ error: 'Twilio credentials not configured' });
+      if (!twilioPhoneNumber) {
+        return res.status(500).json({ error: 'Twilio phone number not configured' });
       }
 
-      // Initialize Twilio client
-      const twilio = await import('twilio');
-      const twilioClient = twilio.default(twilioAccountSid, twilioAuthToken);
-
-      // Get companion details for TwiML
+      // Get companion details
       const companions = await storage.getCompanions("default-user");
       const companion = companions.find(c => c.id === companionId);
 
@@ -293,46 +283,26 @@ async function ensureDefaultUser() {
         return res.status(404).json({ error: 'Companion not found' });
       }
 
-      // Create call log first
-      const callLog = await storage.createCallLog({
-        userId: "default-user",
+      // Set active companion for incoming calls
+      await storage.setActiveCompanion("default-user", companionId);
+
+      Logger.info('twilio', 'Companion activated for incoming calls', {
         companionId,
-        status: "initiating"
+        companionName: companion.name
       });
 
-      // Initiate Twilio call
-      const call = await twilioClient.calls.create({
-        url: `https://${req.get('host')}/webhooks/twilio/call-twiml?companionId=${companionId}`,
-        to: toPhoneNumber,
-        from: twilioPhoneNumber,
-        statusCallback: `https://${req.get('host')}/webhooks/twilio/call-status`,
-        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-        record: true
-      });
-
-      // Update call log with Twilio SID
-      await storage.updateCallLog(callLog.id, {
-        twilioCallSid: call.sid,
-        status: 'initiated'
-      });
-
-      Logger.info('twilio', 'Call initiated', {
-        callId: callLog.id,
-        companionId,
-        twilioCallSid: call.sid,
-        toPhoneNumber
-      });
-
-      broadcast({ type: 'call_started', data: { ...callLog, twilioCallSid: call.sid } });
+      broadcast({ type: 'companion_ready_for_calls', data: { companionId, companionName: companion.name } });
 
       res.json({
-        callId: callLog.id,
-        twilioCallSid: call.sid,
-        status: 'initiated'
+        status: 'ready',
+        companionId,
+        companionName: companion.name,
+        phoneNumber: twilioPhoneNumber,
+        message: `Call ${twilioPhoneNumber} to connect with ${companion.name}`
       });
     } catch (error) {
-      Logger.error('api', 'Failed to start call', error as Error);
-      res.status(500).json({ error: 'Failed to start call', details: (error as Error).message });
+      Logger.error('api', 'Failed to prepare for incoming call', error as Error);
+      res.status(500).json({ error: 'Failed to prepare for incoming call', details: (error as Error).message });
     }
   });
 
@@ -357,40 +327,58 @@ async function ensureDefaultUser() {
     }
   });
 
-  // Twilio webhooks
-  app.post("/webhooks/twilio/call-twiml", async (req, res) => {
+  // Twilio webhooks - Handle incoming calls
+  app.post("/webhooks/twilio/voice", async (req, res) => {
     try {
-      const { companionId } = req.query;
+      const { From, CallSid } = req.body;
 
-      if (!companionId) {
-        return res.status(400).send('<Response><Say>Error: No companion specified</Say></Response>');
-      }
+      Logger.info('twilio', 'Incoming call received', { from: From, callSid: CallSid });
 
-      // Get companion details
+      // Get active companion
       const companions = await storage.getCompanions("default-user");
-      const companion = companions.find(c => c.id === companionId);
+      const activeCompanion = companions.find(c => c.isActive);
 
-      if (!companion) {
-        return res.status(404).send('<Response><Say>Error: Companion not found</Say></Response>');
+      if (!activeCompanion) {
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Joanna">Hello! Welcome to SoulSync. No companion is currently active. Please activate a companion in the app first.</Say>
+</Response>`;
+        res.type('text/xml');
+        return res.send(twiml);
       }
+
+      // Create call log
+      const callLog = await storage.createCallLog({
+        userId: "default-user",
+        companionId: activeCompanion.id,
+        status: "answered",
+        twilioCallSid: CallSid
+      });
+
+      Logger.info('twilio', 'Call connected to companion', {
+        callId: callLog.id,
+        companionId: activeCompanion.id,
+        companionName: activeCompanion.name,
+        from: From
+      });
+
+      broadcast({ type: 'call_connected', data: callLog });
 
       // Generate TwiML response
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">Hello! You are now connected to ${companion.name}. This is a voice AI companion powered by SoulSync.</Say>
+  <Say voice="Polly.Joanna">Hello! You are now connected to ${activeCompanion.name}. This is a voice AI companion powered by SoulSync.</Say>
   <Pause length="1"/>
-  <Say voice="Polly.Joanna">The AI voice integration is coming soon. For now, this is a test call.</Say>
+  <Say voice="Polly.Joanna">The full AI voice integration with Eleven Labs and Kindroid is coming soon. For now, this is a test call.</Say>
   <Pause length="2"/>
   <Say voice="Polly.Joanna">Thank you for using SoulSync. Goodbye!</Say>
 </Response>`;
 
-      Logger.info('twilio', 'TwiML generated', { companionId: companion.id });
-
       res.type('text/xml');
       res.send(twiml);
     } catch (error) {
-      Logger.error('twilio', 'TwiML generation failed', error as Error);
-      res.status(500).send('<Response><Say>Error generating voice response</Say></Response>');
+      Logger.error('twilio', 'Voice webhook failed', error as Error);
+      res.status(500).send('<Response><Say>Error processing call</Say></Response>');
     }
   });
 
