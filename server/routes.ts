@@ -54,21 +54,21 @@ async function ensureDefaultUser() {
     await ensureDefaultUser();
   
   const httpServer = createServer(app);
-  
-  // WebSocket server for real-time updates
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-  
+
+  // WebSocket server for real-time updates (use noServer to manually handle upgrades)
+  const wss = new WebSocketServer({ noServer: true });
+
   const clients = new Set<WebSocket>();
-  
+
   wss.on('connection', (ws) => {
     clients.add(ws);
     Logger.info('websocket', 'Client connected');
-    
+
     ws.on('close', () => {
       clients.delete(ws);
       Logger.info('websocket', 'Client disconnected');
     });
-    
+
     ws.on('error', (error) => {
       Logger.error('websocket', 'WebSocket error', error);
     });
@@ -865,34 +865,43 @@ async function ensureDefaultUser() {
       Logger.error('twilio', 'Socket error during upgrade', error as Error);
     });
 
-    if (request.url === '/webhooks/twilio/media-stream') {
+    if (request.url === '/ws') {
+      // Handle regular WebSocket connections for dashboard updates
+      Logger.info('websocket', 'Accepting /ws WebSocket upgrade');
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        Logger.info('websocket', '/ws WebSocket upgraded successfully');
+        wss.emit('connection', ws, request);
+      });
+    } else if (request.url === '/webhooks/twilio/media-stream') {
       Logger.info('twilio', 'Accepting media stream WebSocket upgrade', {
         headLength: head.length,
         socketReadable: socket.readable,
         socketWritable: socket.writable,
-        socketDestroyed: socket.destroyed
+        socketDestroyed: socket.destroyed,
+        socketBufferSize: socket.bufferSize,
+        socketPending: (socket as any).pending
       });
 
-      // Set a timeout to detect if callback is never called
+      // Try calling handleUpgrade synchronously without try-catch to see actual error
       const timeoutId = setTimeout(() => {
-        Logger.error('twilio', 'handleUpgrade callback timeout - callback was never called after 5 seconds', new Error('Upgrade timeout'));
+        Logger.error('twilio', 'handleUpgrade callback timeout - callback was never called after 5 seconds', new Error('Upgrade timeout'), {
+          socketState: {
+            readable: socket.readable,
+            writable: socket.writable,
+            destroyed: socket.destroyed
+          }
+        });
       }, 5000);
 
-      try {
-        mediaStreamWss.handleUpgrade(request, socket, head, (ws) => {
-          clearTimeout(timeoutId);
-          Logger.info('twilio', 'Media stream WebSocket upgraded successfully');
-          ws.on('error', (error) => {
-            Logger.error('twilio', 'WebSocket connection error', error as Error);
-          });
-          mediaStreamWss.emit('connection', ws, request);
-        });
-        Logger.info('twilio', 'handleUpgrade called, waiting for callback');
-      } catch (error) {
+      mediaStreamWss.handleUpgrade(request, socket, head, (ws) => {
         clearTimeout(timeoutId);
-        Logger.error('twilio', 'Failed to upgrade media stream WebSocket', error as Error);
-        socket.destroy();
-      }
+        Logger.info('twilio', 'Media stream WebSocket upgraded successfully');
+        ws.on('error', (error) => {
+          Logger.error('twilio', 'WebSocket connection error', error as Error);
+        });
+        mediaStreamWss.emit('connection', ws, request);
+      });
+      Logger.info('twilio', 'handleUpgrade called, waiting for callback');
     } else {
       Logger.warn('twilio', `Unhandled HTTP upgrade request for URL: ${request.url}`, { error: new Error('Unhandled upgrade request') });
       socket.destroy();
