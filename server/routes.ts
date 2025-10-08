@@ -846,6 +846,10 @@ async function ensureDefaultUser() {
   // WebSocket endpoint for Twilio Media Streams
   const mediaStreamWss = new WebSocketServer({ noServer: true });
 
+  mediaStreamWss.on('error', (error) => {
+    Logger.error('twilio', 'WebSocket server error', error as Error);
+  });
+
   httpServer.on('upgrade', (request, socket, head) => {
     Logger.info('twilio', `HTTP upgrade request received`, {
       url: request.url,
@@ -856,12 +860,23 @@ async function ensureDefaultUser() {
       }
     });
 
+    // Add socket error handler
+    socket.on('error', (error) => {
+      Logger.error('twilio', 'Socket error during upgrade', error as Error);
+    });
+
     if (request.url === '/webhooks/twilio/media-stream') {
       Logger.info('twilio', 'Accepting media stream WebSocket upgrade');
-      mediaStreamWss.handleUpgrade(request, socket, head, (ws) => {
-        Logger.info('twilio', 'Media stream WebSocket upgraded successfully');
-        mediaStreamWss.emit('connection', ws, request);
-      });
+      try {
+        mediaStreamWss.handleUpgrade(request, socket, head, (ws) => {
+          Logger.info('twilio', 'Media stream WebSocket upgraded successfully');
+          mediaStreamWss.emit('connection', ws, request);
+        });
+        Logger.info('twilio', 'handleUpgrade called, waiting for callback');
+      } catch (error) {
+        Logger.error('twilio', 'Failed to upgrade media stream WebSocket', error as Error);
+        socket.destroy();
+      }
     } else {
       Logger.warn('twilio', `Unhandled HTTP upgrade request for URL: ${request.url}`, { error: new Error('Unhandled upgrade request') });
       socket.destroy();
