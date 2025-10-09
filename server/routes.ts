@@ -904,8 +904,8 @@ async function ensureDefaultUser() {
   mediaStreamWss.on('connection', async (ws, request) => {
     Logger.info('twilio', 'Media stream WebSocket connected');
 
-    // Extract parameters from the initial Twilio connection
-    ws.on('message', async (message: string) => {
+    // Wait for the first message to get callSid and companionId, then initialize
+    ws.once('message', async (message: string) => {
       try {
         const data = JSON.parse(message);
 
@@ -913,12 +913,11 @@ async function ensureDefaultUser() {
           const callSid = data.start.callSid;
           const customParameters = data.start.customParameters;
 
-          Logger.info('twilio', 'Media stream started', {
+          Logger.info('twilio', 'Media stream start event received', {
             callSid,
             streamSid: data.start.streamSid,
             companionId: customParameters?.companionId
           });
-          (Logger.debug as any)('twilio', 'Media stream custom parameters', { customParameters });
 
           // Initialize AI session if companion is configured
           if (customParameters?.companionId) {
@@ -926,7 +925,9 @@ async function ensureDefaultUser() {
             const companion = companions.find(c => c.id === customParameters.companionId);
 
             if (companion && process.env.ELEVENLABS_API_KEY && process.env.KINDROID_API_KEY && process.env.DEEPGRAM_API_KEY) {
-              (Logger.debug as any)('twilio', 'All AI services configured, initializing session', { callSid, companionId: companion.id });
+              Logger.info('twilio', 'All AI services configured, initializing session', { callSid, companionId: companion.id });
+
+              // Initialize session and store WebSocket reference
               initializeSession(
                 callSid,
                 companion,
@@ -935,8 +936,12 @@ async function ensureDefaultUser() {
                 process.env.DEEPGRAM_API_KEY
               );
 
-              // Handle the media stream with Deepgram
+              // Call handleMediaStream which will set up its own message handlers
               handleMediaStream(ws, callSid, process.env.DEEPGRAM_API_KEY);
+
+              // Manually trigger the stream start since we already consumed the first message
+              // The handleMediaStream's message handler won't see this first 'start' event
+              ws.emit('message', message);
             } else {
               Logger.warn('twilio', 'AI services not fully configured', {
                 error: 'AI services not fully configured',
