@@ -374,8 +374,8 @@ async function ensureDefaultUser() {
 
       if (hasAIConfigured) {
         // Use Media Streams for real-time AI conversation
-        const hostUrl = `${req.protocol}://${req.get('host')}`;
-        const streamUrl = `wss://${req.get('host')}/webhooks/twilio/media-stream`;
+        // Hardcode custom domain for WebSocket connection
+        const streamUrl = `wss://soulsyncconnect.app/webhooks/twilio/media-stream`;
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Joanna">Hello! Connecting you to ${activeCompanion.name}.</Say>
