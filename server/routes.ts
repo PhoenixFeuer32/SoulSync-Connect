@@ -904,8 +904,18 @@ async function ensureDefaultUser() {
   mediaStreamWss.on('connection', async (ws, request) => {
     Logger.info('twilio', 'Media stream WebSocket connected');
 
+    // Add error and close handlers
+    ws.on('error', (error) => {
+      Logger.error('twilio', 'Media stream WebSocket error in routes', error as Error);
+    });
+
+    ws.on('close', (code, reason) => {
+      Logger.info('twilio', 'Media stream WebSocket closed in routes', { code, reason: reason.toString() });
+    });
+
     // Wait for the first message to get callSid and companionId, then initialize
     ws.once('message', async (message: string) => {
+      Logger.info('twilio', 'First message received on media stream', { messagePreview: message.toString().substring(0, 150) });
       try {
         const data = JSON.parse(message);
 
