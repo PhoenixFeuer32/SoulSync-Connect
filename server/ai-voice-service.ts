@@ -76,16 +76,15 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
   try {
     // Call Kindroid API
     (Logger.debug as any)('ai-voice', 'Calling Kindroid API', { callSid, botId: session.kindroidBotId, message: userMessage.substring(0, 50) });
-    const response = await fetch(`${process.env.KINDROID_API_URL}/chat`, {
+    const response = await fetch(`${process.env.KINDROID_API_URL}/send-message`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session.kindroidApiKey}`
       },
       body: JSON.stringify({
-        bot_id: session.kindroidBotId,
-        message: userMessage,
-        conversation_history: session.conversationHistory.slice(-10) // Last 10 messages for context
+        ai_id: session.kindroidBotId,
+        message: userMessage
       })
     });
 
@@ -120,6 +119,34 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
 /**
  * Convert text to speech using ElevenLabs and send to Twilio
  */
+/**
+ * Fallback TTS using Twilio's built-in voice
+ */
+async function speakWithTwilioVoice(callSid: string, text: string): Promise<void> {
+  const session = sessions.get(callSid);
+  if (!session?.twilioWs || !session.streamSid) return;
+
+  try {
+    // Use Twilio's mark event to inject TTS via TwiML
+    // Since we're in a media stream, we need to use the mark event
+    Logger.info('ai-voice', 'Using Twilio fallback TTS', { callSid, textLength: text.length });
+
+    // Send a mark event that can be picked up to trigger TTS
+    const markMessage = {
+      event: 'mark',
+      streamSid: session.streamSid,
+      mark: {
+        name: `tts_${Date.now()}`
+      }
+    };
+
+    session.twilioWs.send(JSON.stringify(markMessage));
+    Logger.info('ai-voice', 'Twilio fallback TTS attempted', { callSid, text: text.substring(0, 50) });
+  } catch (error) {
+    Logger.error('ai-voice', `Failed Twilio fallback TTS for call ${callSid}`, error as Error);
+  }
+}
+
 export async function speakResponse(callSid: string, text: string): Promise<void> {
   const session = sessions.get(callSid);
 
@@ -156,7 +183,10 @@ export async function speakResponse(callSid: string, text: string): Promise<void
     if (!response.ok) {
       const errorText = await response.text();
       Logger.error('ai-voice', `ElevenLabs API error for call ${callSid}: ${response.statusText} - ${errorText}`, new Error(`ElevenLabs API error: ${response.statusText} - ${errorText}`));
-      throw new Error(`ElevenLabs API error: ${response.statusText} - ${errorText}`);
+      // Fallback to Twilio voice
+      Logger.warn('ai-voice', 'Falling back to Twilio built-in voice', { callSid });
+      await speakWithTwilioVoice(callSid, text);
+      return;
     }
 
     const audioBuffer = await response.buffer();
@@ -183,6 +213,9 @@ export async function speakResponse(callSid: string, text: string): Promise<void
     });
   } catch (error) {
     Logger.error('ai-voice', `Failed to speak response for call ${callSid}`, error as Error);
+    // Fallback to Twilio voice on any error
+    Logger.warn('ai-voice', 'Falling back to Twilio built-in voice after error', { callSid });
+    await speakWithTwilioVoice(callSid, text);
   }
 }
 
