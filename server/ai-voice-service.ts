@@ -402,6 +402,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
               sample_rate: 8000,
               channels: 1,
               interim_results: false,
+              utterance_end_ms: 2000, // Wait 2 seconds of silence before ending utterance
             });
             Logger.info('ai-voice', 'Deepgram live transcription object created', { callSid });
           } catch (error) {
