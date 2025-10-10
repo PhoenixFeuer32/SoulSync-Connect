@@ -150,7 +150,7 @@ async function speakWithGoogleTTS(callSid: string, text: string): Promise<void> 
       input: { text },
       voice: {
         languageCode: 'en-US',
-        name: 'en-US-Neural2-F', // Female voice, sounds natural
+        name: 'en-US-Chirp3-HD-Aoede', // Chirp3 HD voice - high quality
         ssmlGender: 'FEMALE' as const
       },
       audioConfig: {
