@@ -913,13 +913,18 @@ async function ensureDefaultUser() {
       Logger.info('twilio', 'Media stream WebSocket closed in routes', { code, reason: reason.toString() });
     });
 
-    // Wait for the first message to get callSid and companionId, then initialize
-    ws.once('message', async (message: string) => {
-      Logger.info('twilio', 'First message received on media stream', { messagePreview: message.toString().substring(0, 150) });
+    // Listen for messages until we get the 'start' event
+    const messageHandler = async (message: string) => {
+      Logger.info('twilio', 'Message received on media stream', {
+        messagePreview: message.toString().substring(0, 150),
+        event: JSON.parse(message).event
+      });
       try {
         const data = JSON.parse(message);
 
         if (data.event === 'start') {
+          // Remove this handler since we only need to process 'start' once
+          ws.off('message', messageHandler);
           const callSid = data.start.callSid;
           const customParameters = data.start.customParameters;
 
@@ -968,7 +973,10 @@ async function ensureDefaultUser() {
       } catch (error) {
         Logger.error('twilio', 'Media stream message error', error as Error);
       }
-    });
+    };
+
+    // Attach the message handler
+    ws.on('message', messageHandler);
   });
 
   return httpServer;
