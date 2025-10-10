@@ -94,8 +94,8 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
       throw new Error(`Kindroid API error: ${response.statusText} - ${errorText}`);
     }
 
-    const data = await response.json() as { response: string };
-    const aiResponse = data.response;
+    // Kindroid returns plain text, not JSON
+    const aiResponse = await response.text();
 
     // Add AI response to history
     session.conversationHistory.push({
