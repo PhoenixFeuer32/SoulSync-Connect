@@ -160,10 +160,13 @@ export async function speakResponse(callSid: string, text: string): Promise<void
     return;
   }
 
+  const fallbackVoiceId = 'uYXf8XasLslADfZ2MB4u'; // Free tier compatible voice
+  let voiceIdToUse = session.voiceId;
+
   try {
-    Logger.info('ai-voice', 'Calling ElevenLabs TTS', { callSid, textLength: text.length, voiceId: session.voiceId });
+    Logger.info('ai-voice', 'Calling ElevenLabs TTS', { callSid, textLength: text.length, voiceId: voiceIdToUse });
     // Get audio from ElevenLabs
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${session.voiceId}`, {
+    let response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceIdToUse}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -182,11 +185,42 @@ export async function speakResponse(callSid: string, text: string): Promise<void
 
     if (!response.ok) {
       const errorText = await response.text();
-      Logger.error('ai-voice', `ElevenLabs API error for call ${callSid}: ${response.statusText} - ${errorText}`, new Error(`ElevenLabs API error: ${response.statusText} - ${errorText}`));
-      // Fallback to Twilio voice
-      Logger.warn('ai-voice', 'Falling back to Twilio built-in voice', { callSid });
-      await speakWithTwilioVoice(callSid, text);
-      return;
+
+      // Check if it's an instant voice cloning permission error
+      if (errorText.includes('ivc_not_permitted') || errorText.includes('instant')) {
+        Logger.warn('ai-voice', `Primary voice not permitted, trying fallback voice ${fallbackVoiceId}`, { callSid });
+
+        // Retry with fallback voice
+        response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${fallbackVoiceId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'xi-api-key': session.elevenlabsApiKey
+          },
+          body: JSON.stringify({
+            text,
+            model_id: 'eleven_monolingual_v1',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75
+            },
+            output_format: 'ulaw_8000'
+          })
+        });
+
+        if (!response.ok) {
+          const fallbackErrorText = await response.text();
+          Logger.error('ai-voice', `ElevenLabs fallback voice also failed for call ${callSid}: ${response.statusText} - ${fallbackErrorText}`, new Error(`ElevenLabs fallback error: ${response.statusText}`));
+          await speakWithTwilioVoice(callSid, text);
+          return;
+        }
+
+        voiceIdToUse = fallbackVoiceId;
+      } else {
+        Logger.error('ai-voice', `ElevenLabs API error for call ${callSid}: ${response.statusText} - ${errorText}`, new Error(`ElevenLabs API error: ${response.statusText} - ${errorText}`));
+        await speakWithTwilioVoice(callSid, text);
+        return;
+      }
     }
 
     const audioBuffer = await response.buffer();
