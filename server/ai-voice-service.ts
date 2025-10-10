@@ -160,7 +160,7 @@ export async function speakResponse(callSid: string, text: string): Promise<void
     return;
   }
 
-  const fallbackVoiceId = 'uYXf8XasLslADfZ2MB4u'; // Free tier compatible voice
+  const fallbackVoiceId = 'v8DWAeuEGQSfwxqdH9t2'; // Free tier compatible voice
   let voiceIdToUse = session.voiceId;
 
   try {
