@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import fetch from 'node-fetch';
 import { Logger } from './logger.js';
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
+import textToSpeech from '@google-cloud/text-to-speech';
 
 interface KindroidMessage {
   role: 'user' | 'assistant';
@@ -120,30 +121,72 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
  * Convert text to speech using ElevenLabs and send to Twilio
  */
 /**
- * Fallback TTS using Twilio's built-in voice
+ * Fallback TTS using Google Cloud Text-to-Speech
  */
-async function speakWithTwilioVoice(callSid: string, text: string): Promise<void> {
+async function speakWithGoogleTTS(callSid: string, text: string): Promise<void> {
   const session = sessions.get(callSid);
   if (!session?.twilioWs || !session.streamSid) return;
 
   try {
-    // Use Twilio's mark event to inject TTS via TwiML
-    // Since we're in a media stream, we need to use the mark event
-    Logger.info('ai-voice', 'Using Twilio fallback TTS', { callSid, textLength: text.length });
+    Logger.info('ai-voice', 'Using Google Cloud TTS fallback', { callSid, textLength: text.length });
 
-    // Send a mark event that can be picked up to trigger TTS
-    const markMessage = {
-      event: 'mark',
+    // Create credentials from base64 env var or JSON string
+    const credentials = process.env.GOOGLE_CLOUD_CREDENTIALS_BASE64
+      ? JSON.parse(Buffer.from(process.env.GOOGLE_CLOUD_CREDENTIALS_BASE64, 'base64').toString())
+      : process.env.GOOGLE_CLOUD_CREDENTIALS
+      ? JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS)
+      : undefined;
+
+    if (!credentials) {
+      Logger.error('ai-voice', 'Google Cloud credentials not configured', new Error('Missing credentials'));
+      return;
+    }
+
+    // Initialize Google Cloud TTS client
+    const client = new textToSpeech.TextToSpeechClient({ credentials });
+
+    // Prepare the text-to-speech request
+    const request = {
+      input: { text },
+      voice: {
+        languageCode: 'en-US',
+        name: 'en-US-Neural2-F', // Female voice, sounds natural
+        ssmlGender: 'FEMALE' as const
+      },
+      audioConfig: {
+        audioEncoding: 'MULAW' as const, // μ-law format for Twilio
+        sampleRateHertz: 8000 // 8kHz for phone calls
+      },
+    };
+
+    // Generate speech
+    const [response] = await client.synthesizeSpeech(request);
+
+    if (!response.audioContent) {
+      throw new Error('No audio content received from Google TTS');
+    }
+
+    // Convert to base64 for Twilio
+    const audioPayload = Buffer.from(response.audioContent).toString('base64');
+
+    // Send audio to Twilio Media Stream
+    const mediaMessage = {
+      event: 'media',
       streamSid: session.streamSid,
-      mark: {
-        name: `tts_${Date.now()}`
+      media: {
+        payload: audioPayload
       }
     };
 
-    session.twilioWs.send(JSON.stringify(markMessage));
-    Logger.info('ai-voice', 'Twilio fallback TTS attempted', { callSid, text: text.substring(0, 50) });
+    session.twilioWs.send(JSON.stringify(mediaMessage));
+
+    Logger.info('ai-voice', 'Google TTS audio sent to Twilio', {
+      callSid,
+      textLength: text.length,
+      audioSize: response.audioContent.length
+    });
   } catch (error) {
-    Logger.error('ai-voice', `Failed Twilio fallback TTS for call ${callSid}`, error as Error);
+    Logger.error('ai-voice', `Failed Google Cloud TTS for call ${callSid}`, error as Error);
   }
 }
 
@@ -211,14 +254,14 @@ export async function speakResponse(callSid: string, text: string): Promise<void
         if (!response.ok) {
           const fallbackErrorText = await response.text();
           Logger.error('ai-voice', `ElevenLabs fallback voice also failed for call ${callSid}: ${response.statusText} - ${fallbackErrorText}`, new Error(`ElevenLabs fallback error: ${response.statusText}`));
-          await speakWithTwilioVoice(callSid, text);
+          await speakWithGoogleTTS(callSid, text);
           return;
         }
 
         voiceIdToUse = fallbackVoiceId;
       } else {
         Logger.error('ai-voice', `ElevenLabs API error for call ${callSid}: ${response.statusText} - ${errorText}`, new Error(`ElevenLabs API error: ${response.statusText} - ${errorText}`));
-        await speakWithTwilioVoice(callSid, text);
+        await speakWithGoogleTTS(callSid, text);
         return;
       }
     }
@@ -247,9 +290,9 @@ export async function speakResponse(callSid: string, text: string): Promise<void
     });
   } catch (error) {
     Logger.error('ai-voice', `Failed to speak response for call ${callSid}`, error as Error);
-    // Fallback to Twilio voice on any error
-    Logger.warn('ai-voice', 'Falling back to Twilio built-in voice after error', { callSid });
-    await speakWithTwilioVoice(callSid, text);
+    // Fallback to Google Cloud TTS on any error
+    Logger.warn('ai-voice', 'Falling back to Google Cloud TTS after error', { callSid });
+    await speakWithGoogleTTS(callSid, text);
   }
 }
 
