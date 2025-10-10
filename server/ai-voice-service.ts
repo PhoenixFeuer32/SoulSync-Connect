@@ -401,7 +401,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
               encoding: 'mulaw',
               sample_rate: 8000,
               channels: 1,
-              interim_results: false,
+              interim_results: true,
               endpointing: 2500, // Wait 3.5 seconds of silence before finalizing
               speech_final: true
             });
