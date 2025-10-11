@@ -400,12 +400,12 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           // Start Deepgram live transcription
           try {
             deepgramLive = deepgram.listen.live({
-              model: 'nova-2-phonecall', // or 'nova-2' if you are sure
+              model: 'flux-general-en',
               language: 'en-US',
               smart_format: true,
               punctuate: true,
-              encoding: 'mulaw',
-              sample_rate: 8000,
+              encoding: 'linear16',
+              sample_rate: 16000,
               channels: 1,
               interim_results: true, 
               utterance_end_ms: 10000,
