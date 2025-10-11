@@ -1,11 +1,6 @@
 declare module '@rxtk/linear16' {
-  class MulawDecoder {
-    constructor();
-    decode(buffer: Buffer): Buffer;
-  }
-
   const pkg: {
-    MulawDecoder: typeof MulawDecoder;
+    toLinear16: (buffer: Buffer) => Buffer;
   };
 
   export default pkg;

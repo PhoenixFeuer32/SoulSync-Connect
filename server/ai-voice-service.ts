@@ -4,7 +4,7 @@ import { Logger } from './logger.js';
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import textToSpeech from '@google-cloud/text-to-speech';
 import linear16Pkg from '@rxtk/linear16';
-const { MulawDecoder } = linear16Pkg;
+const { toLinear16 } = linear16Pkg;
 
 interface KindroidMessage {
   role: 'user' | 'assistant';
@@ -386,9 +386,6 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
 
   let deepgramLive: any = null;
 
-  // Initialize mulaw decoder for audio conversion
-  const mulawDecoder = new MulawDecoder();
-
   ws.on('message', async (message: string) => {
     try {
       const data = JSON.parse(message);
@@ -503,7 +500,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           // Convert mulaw to linear16 and forward to Deepgram
           if (deepgramLive && data.media?.payload) {
             const mulawData = Buffer.from(data.media.payload, 'base64');
-            const linear16Data = mulawDecoder.decode(mulawData);
+            const linear16Data = toLinear16(mulawData);
             deepgramLive.send(linear16Data);
             // (Logger.debug as any)('ai-voice', 'Forwarded converted audio to Deepgram', { callSid, payloadSize: linear16Data.length }); // Too verbose for production
           }
