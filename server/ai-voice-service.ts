@@ -399,37 +399,73 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           });
 
           Logger.info('ai-voice', 'Initializing Deepgram live transcription', { callSid });
-          // Start Deepgram live transcription
+          // Start Deepgram live transcription with Flux model
           try {
-            deepgramLive = deepgram.listen.live({
+            const fluxOptions = {
                 model: 'flux-general-en',
                 encoding: 'linear16',
                 sample_rate: 16000,
+                channels: 1,
                 eot_threshold: 0.8,
                 eager_eot_threshold: 0.6,
                 eot_timeout_ms: 10000,
-            });
+            };
+            Logger.info('ai-voice', 'Connecting to Deepgram with Flux options', { callSid, options: fluxOptions });
+            deepgramLive = deepgram.listen.live(fluxOptions);
             Logger.info('ai-voice', 'Deepgram live transcription object created', { callSid });
           } catch (error) {
             Logger.error('ai-voice', 'Failed to create Deepgram live connection', error as Error);
             return;
           }
 
-          // Handle transcription results from Flux model
-          deepgramLive.on('TurnInfo', (data: any) => {
+          // Handle Flux state machine events
+          deepgramLive.on('Update', (data: any) => {
+            Logger.info('ai-voice', 'Flux Update event', {
+              callSid,
+              transcript: data.transcript,
+              turnIndex: data.turn_index
+            });
+          });
+
+          deepgramLive.on('EagerEndOfTurn', (data: any) => {
+            Logger.info('ai-voice', 'Flux EagerEndOfTurn event', {
+              callSid,
+              transcript: data.transcript,
+              turnIndex: data.turn_index,
+              eotConfidence: data.end_of_turn_confidence
+            });
+          });
+
+          deepgramLive.on('TurnResumed', (data: any) => {
+            Logger.info('ai-voice', 'Flux TurnResumed event', {
+              callSid,
+              turnIndex: data.turn_index
+            });
+          });
+
+          deepgramLive.on('EndOfTurn', (data: any) => {
             const transcript = data.transcript;
 
-            if (transcript && transcript.trim().length > 0) {
-              Logger.info('ai-voice', 'Turn info transcript received', {
-                callSid,
-                transcript
-              });
+            Logger.info('ai-voice', 'Flux EndOfTurn event', {
+              callSid,
+              transcript,
+              turnIndex: data.turn_index,
+              eotConfidence: data.end_of_turn_confidence
+            });
 
-              // Process the speech
+            // Process the complete turn
+            if (transcript && transcript.trim().length > 0) {
               processUserSpeech(callSid, transcript);
             }
           });
-          
+
+          deepgramLive.on('StartOfTurn', (data: any) => {
+            Logger.info('ai-voice', 'Flux StartOfTurn event', {
+              callSid,
+              turnIndex: data.turn_index
+            });
+          });
+
           deepgramLive.on(LiveTranscriptionEvents.Error, (error: any) => {
             Logger.error('ai-voice', `Deepgram error for call ${callSid}`, error);
           });
