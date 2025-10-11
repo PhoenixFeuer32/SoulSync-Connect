@@ -402,7 +402,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             deepgramLive = deepgram.listen.live({
               model: 'flux-general-en',
               language: 'en-US',
-              smart_format: true,
+              smart_format: false,
               punctuate: true,
               encoding: 'linear16',
               sample_rate: 16000,
