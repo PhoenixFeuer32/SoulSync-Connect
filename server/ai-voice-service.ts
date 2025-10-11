@@ -403,8 +403,11 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
               model: 'nova-2',
               language: 'en-US',
               smart_format: true,
-              encoding: 'mulaw',
-              sample_rate: 8000,
+              filler_words: true,
+              profanity_filter: false,
+              punctuate: true
+              endcoding: 'mulaw',
+              sample_rate: 44000,
               channels: 1,
               interim_results: true, 
               utterance_end_ms: 10000,
