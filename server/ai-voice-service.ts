@@ -382,6 +382,14 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
   Logger.info('ai-voice', 'Media stream connected', { callSid });
 
   // Initialize Deepgram client
+  if (!deepgramApiKey || deepgramApiKey.length < 10) {
+    Logger.error('ai-voice', 'Invalid Deepgram API key', new Error('Missing or invalid API key'));
+    return;
+  }
+  Logger.info('ai-voice', 'Initializing Deepgram client', {
+    callSid,
+    keyPrefix: deepgramApiKey.substring(0, 8) + '...'
+  });
   const deepgram = createClient(deepgramApiKey);
 
   let deepgramLive: any = null;
@@ -411,8 +419,13 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
                 eot_timeout_ms: 10000,
             };
             Logger.info('ai-voice', 'Connecting to Deepgram with Flux options', { callSid, options: fluxOptions });
-            // Use v2/listen endpoint for Flux model
-            deepgramLive = deepgram.listen.live(fluxOptions, 'v2/listen');
+            // Use v2/listen endpoint for Flux model (try both formats)
+            try {
+              deepgramLive = deepgram.listen.live(fluxOptions, 'v2/listen');
+            } catch (endpointError) {
+              Logger.warn('ai-voice', 'Failed with v2/listen, trying :version format', { callSid, error: endpointError });
+              deepgramLive = deepgram.listen.live(fluxOptions, ':version/listen');
+            }
             Logger.info('ai-voice', 'Deepgram live transcription object created', { callSid });
           } catch (error) {
             Logger.error('ai-voice', 'Failed to create Deepgram live connection', error as Error);
@@ -468,7 +481,12 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           });
 
           deepgramLive.on(LiveTranscriptionEvents.Error, (error: any) => {
-            Logger.error('ai-voice', `Deepgram error for call ${callSid}`, error);
+            Logger.error('ai-voice', `Deepgram error for call ${callSid}`, {
+              error: error.message || error,
+              type: error.type,
+              description: error.description,
+              variant: error.variant
+            });
           });
 
           deepgramLive.on(LiveTranscriptionEvents.Open, () => {
