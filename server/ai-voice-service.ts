@@ -403,16 +403,13 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
               model: 'nova-2',
               language: 'en-US',
               smart_format: true,
-              filler_words: true,
-              profanity_filter: false,
               punctuate: true,
               endcoding: 'mulaw',
-              sample_rate: 44000,
+              sample_rate: 10000,
               channels: 1,
               interim_results: true, 
               utterance_end_ms: 10000,
               endpointing: false,
-              
             });
             Logger.info('ai-voice', 'Deepgram live transcription object created', { callSid });
           } catch (error) {
