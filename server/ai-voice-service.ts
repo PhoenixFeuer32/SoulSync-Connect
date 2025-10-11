@@ -400,15 +400,12 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           // Start Deepgram live transcription
           try {
             deepgramLive = deepgram.listen.live({
-              model: 'flux-general-en',
-              language: 'en-US',
-              punctuate: true,
-              encoding: 'linear16',
-              sample_rate: 16000,
-              channels: 1,
-              interim_results: true, 
-              utterance_end_ms: 8000,
-              endpointing: false,
+                model: 'flux-general-en',
+                encoding: 'linear16',
+                sample_rate: 16000,
+                eot_threshold: 0.8,
+                eager_eot_threshold: 0.6,
+                eot_timeout_ms: 10000,
             });
             Logger.info('ai-voice', 'Deepgram live transcription object created', { callSid });
           } catch (error) {
