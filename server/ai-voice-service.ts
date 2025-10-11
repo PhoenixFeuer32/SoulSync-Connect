@@ -420,25 +420,16 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           deepgramLive.on(LiveTranscriptionEvents.Transcript, (data: any) => {
             const transcript = data.channel?.alternatives?.[0]?.transcript;
             const isFinal = data.is_final;
-            const speechFinal = data.speech_final;
 
-            // Log all transcripts to debug
-            if (transcript && transcript.trim().length > 0) {
-              Logger.info('ai-voice', 'Transcript received', {
+            // Only process final transcripts (respects endpointing delay)
+            if (transcript && transcript.trim().length > 0 && isFinal) {
+              Logger.info('ai-voice', 'Final transcript received', {
                 callSid,
-                transcript,
-                isFinal,
-                speechFinal
+                transcript
               });
 
-              // Only process speech_final transcripts (respects endpointing delay)
-              if (speechFinal) {
-                Logger.info('ai-voice', 'Processing speech final transcript', {
-                  callSid,
-                  transcript
-                });
-                processUserSpeech(callSid, transcript);
-              }
+              // Process the speech
+              processUserSpeech(callSid, transcript);
             }
           });
 
