@@ -3,6 +3,7 @@ import fetch from 'node-fetch';
 import { Logger } from './logger.js';
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import textToSpeech from '@google-cloud/text-to-speech';
+import { MulawDecoder } from '@rxtk/linear16';
 
 interface KindroidMessage {
   role: 'user' | 'assistant';
@@ -384,6 +385,9 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
 
   let deepgramLive: any = null;
 
+  // Initialize mulaw decoder for audio conversion
+  const mulawDecoder = new MulawDecoder();
+
   ws.on('message', async (message: string) => {
     try {
       const data = JSON.parse(message);
@@ -413,9 +417,19 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             return;
           }
 
-          // Handle transcription results
-          deepgramLive.on('TurnInfo', (data) => {
+          // Handle transcription results from Flux model
+          deepgramLive.on('TurnInfo', (data: any) => {
             const transcript = data.transcript;
+
+            if (transcript && transcript.trim().length > 0) {
+              Logger.info('ai-voice', 'Turn info transcript received', {
+                callSid,
+                transcript
+              });
+
+              // Process the speech
+              processUserSpeech(callSid, transcript);
+            }
           });
           
           deepgramLive.on(LiveTranscriptionEvents.Error, (error: any) => {
@@ -485,11 +499,12 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           break;
 
         case 'media':
-          // Forward audio to Deepgram
+          // Convert mulaw to linear16 and forward to Deepgram
           if (deepgramLive && data.media?.payload) {
-            const audioData = Buffer.from(data.media.payload, 'base64');
-            deepgramLive.send(audioData);
-            // (Logger.debug as any)('ai-voice', 'Forwarded audio to Deepgram', { callSid, payloadSize: audioData.length }); // Too verbose for production
+            const mulawData = Buffer.from(data.media.payload, 'base64');
+            const linear16Data = mulawDecoder.decode(mulawData);
+            deepgramLive.send(linear16Data);
+            // (Logger.debug as any)('ai-voice', 'Forwarded converted audio to Deepgram', { callSid, payloadSize: linear16Data.length }); // Too verbose for production
           }
           break;
 
