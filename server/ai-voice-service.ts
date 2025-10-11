@@ -406,9 +406,10 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
               encoding: 'mulaw',
               sample_rate: 8000,
               channels: 1,
+              interim_results: true, 
+              utterance_end_ms: 5000
               endpointing: false,
-              interim_results: true,
-              utterance_end_ms=5000
+              
             });
             Logger.info('ai-voice', 'Deepgram live transcription object created', { callSid });
           } catch (error) {
