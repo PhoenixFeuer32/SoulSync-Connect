@@ -481,12 +481,13 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           });
 
           deepgramLive.on(LiveTranscriptionEvents.Error, (error: any) => {
-            Logger.error('ai-voice', `Deepgram error for call ${callSid}`, {
-              error: error.message || error,
+            const errorDetails = {
+              message: error.message || String(error),
               type: error.type,
               description: error.description,
               variant: error.variant
-            });
+            };
+            Logger.error('ai-voice', `Deepgram error for call ${callSid}`, new Error(JSON.stringify(errorDetails)));
           });
 
           deepgramLive.on(LiveTranscriptionEvents.Open, () => {
