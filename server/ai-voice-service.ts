@@ -414,9 +414,8 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           }
 
           // Handle transcription results
-          deepgramLive.on(LiveTranscriptionEvents.Transcript, (data: any) => {
-            const transcript = data.channel?.alternatives?.[0]?.transcript;
-            const isFinal = data.is_final;
+          deepgramLive.on('TurnInfo', (data) => {
+            const transcript = data.transcript;
 
             // Only process final transcripts (respects endpointing delay)
             if (transcript && transcript.trim().length > 0 && isFinal) {
