@@ -338,9 +338,14 @@ export function endSession(callSid: string) {
   const session = sessions.get(callSid);
 
   if (session) {
-    // Clear keep-alive interval
+    // Clear Twilio keep-alive interval
     if ((session as any).keepAliveInterval) {
       clearInterval((session as any).keepAliveInterval);
+    }
+
+    // Clear Deepgram keep-alive interval
+    if ((session as any).deepgramKeepAliveInterval) {
+      clearInterval((session as any).deepgramKeepAliveInterval);
     }
 
     // Close Deepgram connection if exists
@@ -453,8 +458,25 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             }
           }, 1000);
 
-          // Send keep-alive marks to prevent timeout
-          const keepAliveInterval = setInterval(() => {
+          // Send keep-alive to Deepgram to prevent connection timeout
+          const deepgramKeepAliveInterval = setInterval(() => {
+            if (deepgramLive) {
+              try {
+                deepgramLive.keepAlive();
+                (Logger.debug as any)('ai-voice', 'Deepgram KeepAlive sent', { callSid });
+              } catch (e) {
+                clearInterval(deepgramKeepAliveInterval);
+              }
+            } else {
+              clearInterval(deepgramKeepAliveInterval);
+            }
+          }, 5000); // Every 5 seconds to prevent 10-second timeout
+
+          // Store Deepgram keep-alive interval for cleanup
+          (session as any).deepgramKeepAliveInterval = deepgramKeepAliveInterval;
+
+          // Send keep-alive marks to Twilio to prevent timeout
+          const twilioKeepAliveInterval = setInterval(() => {
             if (session.twilioWs && session.streamSid) {
               try {
                 session.twilioWs.send(JSON.stringify({
@@ -465,15 +487,15 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
                   }
                 }));
               } catch (e) {
-                clearInterval(keepAliveInterval);
+                clearInterval(twilioKeepAliveInterval);
               }
             } else {
-              clearInterval(keepAliveInterval);
+              clearInterval(twilioKeepAliveInterval);
             }
           }, 10000); // Every 10 seconds
 
-          // Store interval for cleanup
-          (session as any).keepAliveInterval = keepAliveInterval;
+          // Store Twilio keep-alive interval for cleanup
+          (session as any).keepAliveInterval = twilioKeepAliveInterval;
 
           break;
 
