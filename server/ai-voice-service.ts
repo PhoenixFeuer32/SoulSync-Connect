@@ -3,7 +3,8 @@ import fetch from 'node-fetch';
 import { Logger } from './logger.js';
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import textToSpeech from '@google-cloud/text-to-speech';
-import { MulawDecoder } from '@rxtk/linear16';
+import linear16Pkg from '@rxtk/linear16';
+const { MulawDecoder } = linear16Pkg;
 
 interface KindroidMessage {
   role: 'user' | 'assistant';
