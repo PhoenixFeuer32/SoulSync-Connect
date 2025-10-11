@@ -409,7 +409,6 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
               endpointing: 2500,
               utterance_end_ms: 3000,
               interim_results: true,
-              speech_final: true
             });
             Logger.info('ai-voice', 'Deepgram live transcription object created', { callSid });
           } catch (error) {
