@@ -411,7 +411,8 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
                 eot_timeout_ms: 10000,
             };
             Logger.info('ai-voice', 'Connecting to Deepgram with Flux options', { callSid, options: fluxOptions });
-            deepgramLive = deepgram.listen.live(fluxOptions);
+            // Use v2/listen endpoint for Flux model
+            deepgramLive = deepgram.listen.live(fluxOptions, 'v2/listen');
             Logger.info('ai-voice', 'Deepgram live transcription object created', { callSid });
           } catch (error) {
             Logger.error('ai-voice', 'Failed to create Deepgram live connection', error as Error);
