@@ -405,7 +405,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
               smart_format: true,
               filler_words: true,
               profanity_filter: false,
-              punctuate: true
+              punctuate: true,
               endcoding: 'mulaw',
               sample_rate: 44000,
               channels: 1,
