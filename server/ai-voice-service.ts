@@ -407,7 +407,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
               sample_rate: 8000,
               channels: 1,
               interim_results: true, 
-              utterance_end_ms: 5000
+              utterance_end_ms: 5000,
               endpointing: false,
               
             });
