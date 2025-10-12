@@ -390,7 +390,13 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
     callSid,
     keyPrefix: deepgramApiKey.substring(0, 8) + '...'
   });
-  const deepgram = createClient(deepgramApiKey);
+
+  // Create Deepgram client with explicit port 443
+  const deepgram = createClient(deepgramApiKey, {
+    global: {
+      url: 'https://api.deepgram.com:443'
+    }
+  });
 
   let deepgramLive: any = null;
 
@@ -420,33 +426,26 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             };
             Logger.info('ai-voice', 'Connecting to Deepgram with Flux options', { callSid, options: fluxOptions });
 
-            // First, let's test if v1 endpoint works at all
-            Logger.info('ai-voice', 'Testing with v1/listen endpoint first', { callSid });
-            const testOptions = {
-                model: 'nova-2',
-                encoding: 'linear16',
-                sample_rate: 16000,
-                channels: 1,
-                interim_results: false
-            };
-            deepgramLive = deepgram.listen.live(testOptions); // Default v1/listen
+            // Let SDK auto-detect endpoint based on model - Flux should auto-route to v2
+            deepgramLive = deepgram.listen.live(fluxOptions);
 
-            Logger.info('ai-voice', 'Deepgram live transcription object created with v1 endpoint', { callSid });
+            Logger.info('ai-voice', 'Deepgram live transcription object created with Flux', { callSid });
           } catch (error) {
             Logger.error('ai-voice', 'Failed to create Deepgram live connection', error as Error);
             return;
           }
 
-          // Handle transcript events (v1 endpoint)
-          deepgramLive.on(LiveTranscriptionEvents.Transcript, (data: any) => {
-            const transcript = data.channel?.alternatives?.[0]?.transcript;
-            const isFinal = data.is_final;
+          // Handle Flux state machine events
+          deepgramLive.on('EndOfTurn', (data: any) => {
+            const transcript = data.transcript;
 
-            if (transcript && transcript.trim().length > 0 && isFinal) {
-              Logger.info('ai-voice', 'Final transcript received', {
-                callSid,
-                transcript
-              });
+            Logger.info('ai-voice', 'Flux EndOfTurn event', {
+              callSid,
+              transcript,
+              turnIndex: data.turn_index
+            });
+
+            if (transcript && transcript.trim().length > 0) {
               processUserSpeech(callSid, transcript);
             }
           });
