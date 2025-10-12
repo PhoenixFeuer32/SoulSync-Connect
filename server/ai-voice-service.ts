@@ -426,10 +426,10 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             };
             Logger.info('ai-voice', 'Connecting to Deepgram with Flux options', { callSid, options: fluxOptions });
 
-            // Let SDK auto-detect endpoint based on model - Flux should auto-route to v2
-            deepgramLive = deepgram.listen.live(fluxOptions);
+            // Explicitly use v2 endpoint for Flux (SDK defaults to v1)
+            deepgramLive = deepgram.listen.live(fluxOptions, 'v2/listen');
 
-            Logger.info('ai-voice', 'Deepgram live transcription object created with Flux', { callSid });
+            Logger.info('ai-voice', 'Deepgram live transcription object created with Flux on v2 endpoint', { callSid });
           } catch (error) {
             Logger.error('ai-voice', 'Failed to create Deepgram live connection', error as Error);
             return;
