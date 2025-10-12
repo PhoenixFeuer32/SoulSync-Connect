@@ -419,60 +419,36 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
                 eot_timeout_ms: 10000,
             };
             Logger.info('ai-voice', 'Connecting to Deepgram with Flux options', { callSid, options: fluxOptions });
-            // Use v2/listen endpoint for Flux model
-            deepgramLive = deepgram.listen.live(fluxOptions, 'v2/listen');
-            Logger.info('ai-voice', 'Deepgram live transcription object created', { callSid });
+
+            // First, let's test if v1 endpoint works at all
+            Logger.info('ai-voice', 'Testing with v1/listen endpoint first', { callSid });
+            const testOptions = {
+                model: 'nova-2',
+                encoding: 'linear16',
+                sample_rate: 16000,
+                channels: 1,
+                interim_results: false
+            };
+            deepgramLive = deepgram.listen.live(testOptions); // Default v1/listen
+
+            Logger.info('ai-voice', 'Deepgram live transcription object created with v1 endpoint', { callSid });
           } catch (error) {
             Logger.error('ai-voice', 'Failed to create Deepgram live connection', error as Error);
             return;
           }
 
-          // Handle Flux state machine events
-          deepgramLive.on('Update', (data: any) => {
-            Logger.info('ai-voice', 'Flux Update event', {
-              callSid,
-              transcript: data.transcript,
-              turnIndex: data.turn_index
-            });
-          });
+          // Handle transcript events (v1 endpoint)
+          deepgramLive.on(LiveTranscriptionEvents.Transcript, (data: any) => {
+            const transcript = data.channel?.alternatives?.[0]?.transcript;
+            const isFinal = data.is_final;
 
-          deepgramLive.on('EagerEndOfTurn', (data: any) => {
-            Logger.info('ai-voice', 'Flux EagerEndOfTurn event', {
-              callSid,
-              transcript: data.transcript,
-              turnIndex: data.turn_index,
-              eotConfidence: data.end_of_turn_confidence
-            });
-          });
-
-          deepgramLive.on('TurnResumed', (data: any) => {
-            Logger.info('ai-voice', 'Flux TurnResumed event', {
-              callSid,
-              turnIndex: data.turn_index
-            });
-          });
-
-          deepgramLive.on('EndOfTurn', (data: any) => {
-            const transcript = data.transcript;
-
-            Logger.info('ai-voice', 'Flux EndOfTurn event', {
-              callSid,
-              transcript,
-              turnIndex: data.turn_index,
-              eotConfidence: data.end_of_turn_confidence
-            });
-
-            // Process the complete turn
-            if (transcript && transcript.trim().length > 0) {
+            if (transcript && transcript.trim().length > 0 && isFinal) {
+              Logger.info('ai-voice', 'Final transcript received', {
+                callSid,
+                transcript
+              });
               processUserSpeech(callSid, transcript);
             }
-          });
-
-          deepgramLive.on('StartOfTurn', (data: any) => {
-            Logger.info('ai-voice', 'Flux StartOfTurn event', {
-              callSid,
-              turnIndex: data.turn_index
-            });
           });
 
           deepgramLive.on(LiveTranscriptionEvents.Error, (error: any) => {
