@@ -390,11 +390,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
     callSid,
     keyPrefix: deepgramApiKey.substring(0, 8) + '...'
   });
-  const deepgram = createClient(deepgramApiKey, {
-    global: {
-      url: 'https://api.deepgram.com'
-    }
-  });
+  const deepgram = createClient(deepgramApiKey);
 
   let deepgramLive: any = null;
 
