@@ -3,8 +3,7 @@ import fetch from 'node-fetch';
 import { Logger } from './logger.js';
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import textToSpeech from '@google-cloud/text-to-speech';
-import linear16Pkg from '@rxtk/linear16';
-const { toLinear16 } = linear16Pkg;
+import { mulaw } from 'alawmulaw';
 
 interface KindroidMessage {
   role: 'user' | 'assistant';
@@ -497,12 +496,20 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             Logger.info('ai-voice', 'Deepgram connection opened', { callSid });
           });
 
+          deepgramLive.on(LiveTranscriptionEvents.UtteranceEnd, (data: any) => {
+            Logger.info('ai-voice', 'Deepgram UtteranceEnd event', {
+              callSid,
+              data: JSON.stringify(data)
+            });
+          });
+
           deepgramLive.on(LiveTranscriptionEvents.Close, (event: any) => {
             Logger.info('ai-voice', 'Deepgram connection closed', {
               callSid,
               code: event?.code,
               reason: event?.reason,
-              dgError: event?.[' dg-error'],
+              fullEvent: JSON.stringify(event),
+              dgError: event?.['dg-error'],
               dgRequestId: event?.['dg-request-id']
             });
           });
@@ -562,11 +569,23 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           break;
 
         case 'media':
-          // Convert mulaw to linear16 and forward to Deepgram
+          // Convert mulaw (8kHz) to linear16 PCM (16kHz) and forward to Deepgram
           if (deepgramLive && data.media?.payload) {
             const mulawData = Buffer.from(data.media.payload, 'base64');
-            const linear16Data = toLinear16(mulawData);
-            deepgramLive.send(linear16Data);
+
+            // Decode mulaw to 16-bit PCM (returns Int16Array)
+            const pcm8k = mulaw.decode(new Uint8Array(mulawData));
+
+            // Upsample from 8kHz to 16kHz by simple interpolation (duplicate each sample)
+            const pcm16k = new Int16Array(pcm8k.length * 2);
+            for (let i = 0; i < pcm8k.length; i++) {
+              pcm16k[i * 2] = pcm8k[i];
+              pcm16k[i * 2 + 1] = pcm8k[i];  // Duplicate sample for simple upsampling
+            }
+
+            // Convert Int16Array to Buffer for sending
+            const linear16Buffer = Buffer.from(pcm16k.buffer);
+            deepgramLive.send(linear16Buffer);
 
             // Log first few media packets to verify audio is flowing
             if (!(session as any).mediaPacketCount) (session as any).mediaPacketCount = 0;
@@ -576,7 +595,9 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
                 callSid,
                 packetNum: (session as any).mediaPacketCount,
                 mulawSize: mulawData.length,
-                linear16Size: linear16Data.length
+                pcm8kSamples: pcm8k.length,
+                pcm16kSamples: pcm16k.length,
+                linear16Size: linear16Buffer.length
               });
             }
           }
