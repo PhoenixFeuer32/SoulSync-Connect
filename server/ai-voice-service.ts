@@ -435,6 +435,21 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           }
 
           // Handle Flux state machine events
+          deepgramLive.on('StartOfTurn', (data: any) => {
+            Logger.info('ai-voice', 'Flux StartOfTurn event', {
+              callSid,
+              turnIndex: data.turn_index
+            });
+          });
+
+          deepgramLive.on('Update', (data: any) => {
+            Logger.info('ai-voice', 'Flux Update event', {
+              callSid,
+              transcript: data.transcript,
+              turnIndex: data.turn_index
+            });
+          });
+
           deepgramLive.on('EndOfTurn', (data: any) => {
             const transcript = data.transcript;
 
@@ -447,6 +462,20 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             if (transcript && transcript.trim().length > 0) {
               processUserSpeech(callSid, transcript);
             }
+          });
+
+          // Log all events to debug what Deepgram is actually sending
+          deepgramLive.on('Metadata', (data: any) => {
+            Logger.info('ai-voice', 'Deepgram Metadata event', {
+              callSid,
+              data,
+              dgError: data['dg-error'],
+              dgRequestId: data['dg-request-id']
+            });
+          });
+
+          deepgramLive.on(LiveTranscriptionEvents.Transcript, (data: any) => {
+            Logger.info('ai-voice', 'Deepgram Transcript event (should not fire for Flux)', { callSid, data });
           });
 
           deepgramLive.on(LiveTranscriptionEvents.Error, (error: any) => {
@@ -472,7 +501,9 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             Logger.info('ai-voice', 'Deepgram connection closed', {
               callSid,
               code: event?.code,
-              reason: event?.reason
+              reason: event?.reason,
+              dgError: event?.[' dg-error'],
+              dgRequestId: event?.['dg-request-id']
             });
           });
 
@@ -536,7 +567,18 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             const mulawData = Buffer.from(data.media.payload, 'base64');
             const linear16Data = toLinear16(mulawData);
             deepgramLive.send(linear16Data);
-            // (Logger.debug as any)('ai-voice', 'Forwarded converted audio to Deepgram', { callSid, payloadSize: linear16Data.length }); // Too verbose for production
+
+            // Log first few media packets to verify audio is flowing
+            if (!(session as any).mediaPacketCount) (session as any).mediaPacketCount = 0;
+            (session as any).mediaPacketCount++;
+            if ((session as any).mediaPacketCount <= 3) {
+              Logger.info('ai-voice', 'Audio forwarded to Deepgram', {
+                callSid,
+                packetNum: (session as any).mediaPacketCount,
+                mulawSize: mulawData.length,
+                linear16Size: linear16Data.length
+              });
+            }
           }
           break;
 
