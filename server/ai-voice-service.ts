@@ -419,7 +419,6 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
                 model: 'flux-general-en',
                 encoding: 'linear16',
                 sample_rate: 16000,
-                channels: 1,
                 eot_threshold: 0.8,
                 eager_eot_threshold: 0.6,
                 eot_timeout_ms: 10000,
