@@ -390,7 +390,11 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
     callSid,
     keyPrefix: deepgramApiKey.substring(0, 8) + '...'
   });
-  const deepgram = createClient(deepgramApiKey);
+  const deepgram = createClient(deepgramApiKey, {
+    global: {
+      url: 'https://api.deepgram.com'
+    }
+  });
 
   let deepgramLive: any = null;
 
@@ -419,13 +423,8 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
                 eot_timeout_ms: 10000,
             };
             Logger.info('ai-voice', 'Connecting to Deepgram with Flux options', { callSid, options: fluxOptions });
-            // Use v2/listen endpoint for Flux model (try both formats)
-            try {
-              deepgramLive = deepgram.listen.live(fluxOptions, 'v2/listen');
-            } catch (endpointError) {
-              Logger.warn('ai-voice', 'Failed with v2/listen, trying :version format', { callSid, error: endpointError });
-              deepgramLive = deepgram.listen.live(fluxOptions, ':version/listen');
-            }
+            // Use v2/listen endpoint for Flux model
+            deepgramLive = deepgram.listen.live(fluxOptions, 'v2/listen');
             Logger.info('ai-voice', 'Deepgram live transcription object created', { callSid });
           } catch (error) {
             Logger.error('ai-voice', 'Failed to create Deepgram live connection', error as Error);
@@ -485,7 +484,12 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
               message: error.message || String(error),
               type: error.type,
               description: error.description,
-              variant: error.variant
+              variant: error.variant,
+              code: error.code,
+              status: error.status,
+              dgRequestId: error['dg-request-id'] || error.dgRequestId,
+              dgError: error['dg-error'] || error.dgError,
+              rawError: JSON.stringify(error)
             };
             Logger.error('ai-voice', `Deepgram error for call ${callSid}`, new Error(JSON.stringify(errorDetails)));
           });
@@ -494,8 +498,12 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             Logger.info('ai-voice', 'Deepgram connection opened', { callSid });
           });
 
-          deepgramLive.on(LiveTranscriptionEvents.Close, () => {
-            Logger.info('ai-voice', 'Deepgram connection closed', { callSid });
+          deepgramLive.on(LiveTranscriptionEvents.Close, (event: any) => {
+            Logger.info('ai-voice', 'Deepgram connection closed', {
+              callSid,
+              code: event?.code,
+              reason: event?.reason
+            });
           });
 
           session.deepgramConnection = deepgramLive;
