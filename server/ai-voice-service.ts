@@ -405,16 +405,8 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
   ws.on('message', async (message: string) => {
     try {
       const data = JSON.parse(message);
-
-      switch (data.event) {
-        case 'start':
-          session.streamSid = data.start.streamSid;
-          Logger.info('ai-voice', 'Stream started', {
-            callSid,
-            streamSid: data.start.streamSid
-          });
-
-          // Send initial greeting
+          
+      // Send initial greeting
           try {
             Logger.info('ai-voice', 'Sending initial greeting', { callSid });
             await speakResponse(callSid, `Hello! I'm ready to talk. How can I help you today?`);
@@ -422,7 +414,13 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           } catch (error) {
             Logger.error('ai-voice', `Failed to send initial greeting for call ${callSid}`, error as Error);
           }
-
+        switch (data.event) {
+        case 'start':
+          session.streamSid = data.start.streamSid;
+          Logger.info('ai-voice', 'Stream started', {
+            callSid,
+            streamSid: data.start.streamSid
+          });
           Logger.info('ai-voice', 'Initializing Deepgram live transcription', { callSid });
           // Start Deepgram live transcription with Flux model
           try {
