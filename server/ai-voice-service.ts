@@ -19,7 +19,7 @@ interface ConversationSession {
   elevenlabsApiKey: string;
   conversationHistory: KindroidMessage[];
   callSid: string;
-  deepgramConnection?: any;
+  deepgramConnection?: WebSocket;
   twilioWs?: WebSocket;
   streamSid?: string;
   isProcessing: boolean;
