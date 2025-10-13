@@ -515,6 +515,17 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             });
           });
 
+          // Catch-all for any other Deepgram events
+          deepgramLive.on('*', (event: any, data: any) => {
+            Logger.info('ai-voice', `Deepgram generic event: ${event}`, {
+              callSid,
+              event,
+              data: JSON.stringify(data),
+              dgError: data?.['dg-error'],
+              dgRequestId: data?.['dg-request-id']
+            });
+          });
+
           session.deepgramConnection = deepgramLive;
 
           // Send initial greeting
