@@ -23,7 +23,8 @@ interface ConversationSession {
   twilioWs?: WebSocket;
   streamSid?: string;
   isProcessing: boolean;
-  audioBuffer: string[];
+  audioBuffer: Buffer[]; // Change to Buffer[] to store raw audio chunks
+  initialGreetingSent: boolean; // New flag to track if greeting has been sent
 }
 
 const sessions = new Map<string, ConversationSession>();
@@ -48,6 +49,7 @@ export function initializeSession(
     callSid,
     isProcessing: false,
     audioBuffer: [],
+    initialGreetingSent: false, // Initialize the new flag
   };
   sessions.set(callSid, newSession);
 
@@ -412,6 +414,15 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             streamSid: data.start.streamSid
           });
 
+          // Send initial greeting
+          try {
+            Logger.info('ai-voice', 'Sending initial greeting', { callSid });
+            await speakResponse(callSid, `Hello! I'm ready to talk. How can I help you today?`);
+            Logger.info('ai-voice', 'Initial greeting sent successfully', { callSid });
+          } catch (error) {
+            Logger.error('ai-voice', `Failed to send initial greeting for call ${callSid}`, error as Error);
+          }
+
           Logger.info('ai-voice', 'Initializing Deepgram live transcription', { callSid });
           // Start Deepgram live transcription with Flux model
           try {
@@ -527,17 +538,6 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           });
 
           session.deepgramConnection = deepgramLive;
-
-          // Send initial greeting
-          setTimeout(async () => {
-            try {
-              Logger.info('ai-voice', 'Sending initial greeting', { callSid });
-              await speakResponse(callSid, `Hello! I'm ready to talk. How can I help you today?`);
-              Logger.info('ai-voice', 'Initial greeting sent successfully', { callSid });
-            } catch (error) {
-              Logger.error('ai-voice', `Failed to send initial greeting for call ${callSid}`, error as Error);
-            }
-          }, 1000);
 
           // Send keep-alive to Deepgram to prevent connection timeout
           const deepgramKeepAliveInterval = setInterval(() => {
