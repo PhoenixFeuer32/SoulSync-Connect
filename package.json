@@ -12,7 +12,7 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
-    "@deepgram/sdk": "^4.11.2",
+    "@aws-sdk/client-transcribe-streaming": "^3.916.0",
     "@google-cloud/text-to-speech": "^6.3.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",

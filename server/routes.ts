@@ -370,7 +370,8 @@ async function ensureDefaultUser() {
                              activeCompanion.voiceId &&
                              process.env.ELEVENLABS_API_KEY &&
                              process.env.KINDROID_API_KEY &&
-                             process.env.DEEPGRAM_API_KEY;
+                             process.env.AWS_ACCESS_KEY_ID &&
+                             process.env.AWS_SECRET_ACCESS_KEY;
 
       if (hasAIConfigured) {
         // Use Media Streams for real-time AI conversation
@@ -394,7 +395,7 @@ async function ensureDefaultUser() {
           companionId: activeCompanion.id,
           hasElevenLabs: !!process.env.ELEVENLABS_API_KEY,
           hasKindroid: !!process.env.KINDROID_API_KEY,
-          hasDeepgram: !!process.env.DEEPGRAM_API_KEY
+          hasAWS: !!process.env.AWS_ACCESS_KEY_ID && !!process.env.AWS_SECRET_ACCESS_KEY
         });
 
         res.type('text/xml');
@@ -939,7 +940,7 @@ async function ensureDefaultUser() {
             const companions = await storage.getCompanions("default-user");
             const companion = companions.find(c => c.id === customParameters.companionId);
 
-            if (companion && process.env.ELEVENLABS_API_KEY && process.env.KINDROID_API_KEY && process.env.DEEPGRAM_API_KEY) {
+            if (companion && process.env.ELEVENLABS_API_KEY && process.env.KINDROID_API_KEY && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
               Logger.info('twilio', 'All AI services configured, initializing session', { callSid, companionId: companion.id });
 
               // Initialize session and store WebSocket reference
@@ -948,11 +949,13 @@ async function ensureDefaultUser() {
                 companion,
                 process.env.ELEVENLABS_API_KEY,
                 process.env.KINDROID_API_KEY,
-                process.env.DEEPGRAM_API_KEY
+                process.env.AWS_REGION || 'us-east-1',
+                process.env.AWS_ACCESS_KEY_ID,
+                process.env.AWS_SECRET_ACCESS_KEY
               );
 
               // Call handleMediaStream which will set up its own message handlers
-              handleMediaStream(ws, callSid, process.env.DEEPGRAM_API_KEY);
+              handleMediaStream(ws, callSid);
 
               // Manually trigger the stream start since we already consumed the first message
               // The handleMediaStream's message handler won't see this first 'start' event
@@ -963,7 +966,7 @@ async function ensureDefaultUser() {
                 hasCompanion: !!companion,
                 hasElevenLabs: !!process.env.ELEVENLABS_API_KEY,
                 hasKindroid: !!process.env.KINDROID_API_KEY,
-                hasDeepgram: !!process.env.DEEPGRAM_API_KEY
+                hasAWS: !!process.env.AWS_ACCESS_KEY_ID && !!process.env.AWS_SECRET_ACCESS_KEY
               });
             }
           } else {
