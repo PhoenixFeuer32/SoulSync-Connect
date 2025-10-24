@@ -93,6 +93,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteCompanion(id: string): Promise<void> {
+    // Delete related call logs first
+    await db.delete(callLogs).where(eq(callLogs.companionId, id));
+
+    // Delete related file shares
+    await db.delete(fileShares).where(eq(fileShares.companionId, id));
+
+    // Now delete the companion
     await db.delete(companions).where(eq(companions.id, id));
   }
 
