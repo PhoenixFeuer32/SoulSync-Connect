@@ -448,7 +448,8 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
           deepgramLive.on('StartOfTurn', (data: any) => {
             Logger.info('ai-voice', 'Flux StartOfTurn event', {
               callSid,
-              turnIndex: data.turn_index
+              turnIndex: data.turn_index,
+              fullData: JSON.stringify(data)
             });
           });
 
@@ -456,7 +457,8 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             Logger.info('ai-voice', 'Flux Update event', {
               callSid,
               transcript: data.transcript,
-              turnIndex: data.turn_index
+              turnIndex: data.turn_index,
+              fullData: JSON.stringify(data)
             });
           });
 
@@ -466,26 +468,13 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
             Logger.info('ai-voice', 'Flux EndOfTurn event', {
               callSid,
               transcript,
-              turnIndex: data.turn_index
+              turnIndex: data.turn_index,
+              fullData: JSON.stringify(data)
             });
 
             if (transcript && transcript.trim().length > 0) {
               processUserSpeech(callSid, transcript);
             }
-          });
-
-          // Log all events to debug what Deepgram is actually sending
-          deepgramLive.on('Metadata', (data: any) => {
-            Logger.info('ai-voice', 'Deepgram Metadata event', {
-              callSid,
-              data,
-              dgError: data['dg-error'],
-              dgRequestId: data['dg-request-id']
-            });
-          });
-
-          deepgramLive.on(LiveTranscriptionEvents.Transcript, (data: any) => {
-            Logger.info('ai-voice', 'Deepgram Transcript event (should not fire for Flux)', { callSid, data });
           });
 
           deepgramLive.on(LiveTranscriptionEvents.Error, (error: any) => {
@@ -505,13 +494,6 @@ export function handleMediaStream(ws: WebSocket, callSid: string, deepgramApiKey
 
           deepgramLive.on(LiveTranscriptionEvents.Open, () => {
             Logger.info('ai-voice', 'Deepgram connection opened', { callSid });
-          });
-
-          deepgramLive.on(LiveTranscriptionEvents.UtteranceEnd, (data: any) => {
-            Logger.info('ai-voice', 'Deepgram UtteranceEnd event', {
-              callSid,
-              data: JSON.stringify(data)
-            });
           });
 
           deepgramLive.on(LiveTranscriptionEvents.Close, (event: any) => {
