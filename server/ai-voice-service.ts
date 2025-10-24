@@ -24,6 +24,7 @@ interface ConversationSession {
   callSid: string;
   transcribeClient?: TranscribeStreamingClient;
   isTranscribing?: boolean;
+  isAISpeaking?: boolean; // Flag to pause transcription while AI speaks
   twilioWs?: WebSocket;
   streamSid?: string;
   isProcessing: boolean;
