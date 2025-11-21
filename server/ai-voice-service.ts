@@ -293,7 +293,13 @@ export async function speakResponse(callSid: string, text: string): Promise<void
     }
 
     const audioBuffer = await response.buffer();
-    (Logger.debug as any)('ai-voice', 'ElevenLabs audio buffer received', { callSid, audioSize: audioBuffer.length });
+
+    // Log first bytes to debug audio format
+    Logger.info('ai-voice', 'ElevenLabs audio buffer received', {
+      callSid,
+      audioSize: audioBuffer.length,
+      firstBytes: audioBuffer.slice(0, 10).toString('hex')
+    });
 
     // Convert to base64 for Twilio
     const audioPayload = audioBuffer.toString('base64');
