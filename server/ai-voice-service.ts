@@ -234,8 +234,8 @@ export async function speakResponse(callSid: string, text: string): Promise<void
 
   try {
     Logger.info('ai-voice', 'Calling ElevenLabs TTS', { callSid, textLength: text.length, voiceId: voiceIdToUse });
-    // Get audio from ElevenLabs
-    let response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceIdToUse}`, {
+    // Get audio from ElevenLabs - use query parameter for output format
+    let response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceIdToUse}?output_format=ulaw_8000`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -247,8 +247,7 @@ export async function speakResponse(callSid: string, text: string): Promise<void
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75
-        },
-        output_format: 'ulaw_8000' // Twilio expects μ-law at 8kHz
+        }
       })
     });
 
@@ -260,7 +259,7 @@ export async function speakResponse(callSid: string, text: string): Promise<void
         Logger.warn('ai-voice', `Primary voice not permitted, trying fallback voice ${fallbackVoiceId}`, { callSid });
 
         // Retry with fallback voice
-        response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${fallbackVoiceId}`, {
+        response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${fallbackVoiceId}?output_format=ulaw_8000`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -272,8 +271,7 @@ export async function speakResponse(callSid: string, text: string): Promise<void
             voice_settings: {
               stability: 0.5,
               similarity_boost: 0.75
-            },
-            output_format: 'ulaw_8000'
+            }
           })
         });
 
