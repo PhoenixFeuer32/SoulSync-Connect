@@ -102,6 +102,7 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
 
   try {
     // Call Kindroid API
+    const kindroidStart = Date.now();
     (Logger.debug as any)('ai-voice', 'Calling Kindroid API', { callSid, botId: session.kindroidBotId, message: userMessage.substring(0, 50) });
     const response = await fetch(`${process.env.KINDROID_API_URL}/send-message`, {
       method: 'POST',
@@ -132,6 +133,7 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
 
     Logger.info('ai-voice', 'AI response generated', {
       callSid,
+      kindroidLatencyMs: Date.now() - kindroidStart,
       userMessage: userMessage.substring(0, 50),
       aiResponse: aiResponse.substring(0, 50)
     });
@@ -233,6 +235,7 @@ export async function speakResponse(callSid: string, text: string): Promise<void
   let voiceIdToUse = session.voiceId;
 
   try {
+    const ttsStart = Date.now();
     Logger.info('ai-voice', 'Calling ElevenLabs TTS', { callSid, textLength: text.length, voiceId: voiceIdToUse });
     // Get audio from ElevenLabs - use query parameter for output format
     let response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceIdToUse}?output_format=ulaw_8000`, {
@@ -295,6 +298,7 @@ export async function speakResponse(callSid: string, text: string): Promise<void
     // Log first bytes to debug audio format
     Logger.info('ai-voice', 'ElevenLabs audio buffer received', {
       callSid,
+      ttsLatencyMs: Date.now() - ttsStart,
       audioSize: audioBuffer.length,
       firstBytes: audioBuffer.slice(0, 10).toString('hex')
     });
@@ -337,6 +341,7 @@ async function processUserSpeech(callSid: string, transcript: string) {
   }
 
   session.isProcessing = true;
+  const totalStart = Date.now();
 
   try {
     Logger.info('ai-voice', 'Processing user speech', { callSid, transcript });
@@ -346,6 +351,8 @@ async function processUserSpeech(callSid: string, transcript: string) {
 
     // Convert to speech and send back
     await speakResponse(callSid, aiResponse);
+
+    Logger.info('ai-voice', 'Total speech processing complete', { callSid, totalLatencyMs: Date.now() - totalStart });
 
   } catch (error) {
     Logger.error('ai-voice', `Failed to process user speech for call ${callSid}`, error as Error);
