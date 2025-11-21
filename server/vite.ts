@@ -66,6 +66,8 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
+  // In production, the structure is: dist/server/vite.js and dist/public/
+  // So we need to go up one level from server to dist, then into public
   const distPath = path.resolve(import.meta.dirname, "..", "public");
 
   if (!fs.existsSync(distPath)) {
