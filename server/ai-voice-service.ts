@@ -243,7 +243,7 @@ export async function speakResponse(callSid: string, text: string): Promise<void
       },
       body: JSON.stringify({
         text,
-        model_id: 'eleven_monolingual_v1',
+        model_id: 'eleven_flash_v2_5',
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75
@@ -267,7 +267,7 @@ export async function speakResponse(callSid: string, text: string): Promise<void
           },
           body: JSON.stringify({
             text,
-            model_id: 'eleven_monolingual_v1',
+            model_id: 'eleven_flash_v2_5',
             voice_settings: {
               stability: 0.5,
               similarity_boost: 0.75
@@ -417,7 +417,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
     return;
   }
 
-  const SILENCE_THRESHOLD_MS = 5000; // 5 seconds of silence before sending batch
+  const SILENCE_THRESHOLD_MS = 2000; // 2 seconds of silence before sending batch
   let audioChunks: Buffer[] = [];
   let transcriptionActive = false;
 
