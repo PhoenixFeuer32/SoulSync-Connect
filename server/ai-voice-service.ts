@@ -454,7 +454,11 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
       const transcriber = new StreamingTranscriber({
         apiKey: process.env.ASSEMBLYAI_API_KEY!,
         sampleRate: 8000,
-        speechModel: 'universal-streaming-english'
+        speechModel: 'universal-streaming-english',
+        // Tune turn detection to be less aggressive
+        endOfTurnConfidenceThreshold: 0.9, // Higher = more confident before ending turn (default: 0.5)
+        minEndOfTurnSilenceWhenConfident: 1000, // Wait 1s of silence when confident (default: 500ms)
+        maxTurnSilence: 2000 // Force end turn after 2s of silence (default: 1500ms)
       });
 
       session.transcriber = transcriber;
