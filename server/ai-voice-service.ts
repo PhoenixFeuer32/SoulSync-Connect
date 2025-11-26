@@ -450,11 +450,10 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
     Logger.info('ai-voice', 'Starting AssemblyAI Realtime Transcription', { callSid });
 
     try {
-      // Create new transcriber
+      // Create new transcriber (defaults to universal-2 model)
       const transcriber = new RealtimeTranscriber({
         apiKey: process.env.ASSEMBLYAI_API_KEY!,
-        sampleRate: 8000,
-        encoding: 'pcm_s16le' // 16-bit PCM little-endian
+        sampleRate: 8000
       });
 
       session.transcriber = transcriber;
