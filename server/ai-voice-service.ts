@@ -579,23 +579,38 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
             // Convert Int16Array to Buffer
             const pcmBuffer = Buffer.from(pcmData.buffer);
 
-            // Send audio directly to AssemblyAI (pass the ArrayBuffer)
-            try {
-              session.transcriber.sendAudio(pcmBuffer.buffer);
-            } catch (error) {
-              Logger.error('ai-voice', 'Failed to send audio to AssemblyAI', error as Error);
+            // Buffer audio chunks - AssemblyAI requires 50-1000ms chunks
+            // At 8kHz 16-bit PCM: 50ms = 800 bytes, 100ms = 1600 bytes
+            if (!(session as any).assemblyAIAudioBuffer) {
+              (session as any).assemblyAIAudioBuffer = [];
             }
+            (session as any).assemblyAIAudioBuffer.push(pcmBuffer);
 
-            // Log first few media packets to verify audio is flowing
-            if (!(session as any).mediaPacketCount) (session as any).mediaPacketCount = 0;
-            (session as any).mediaPacketCount++;
-            if ((session as any).mediaPacketCount <= 3) {
-              Logger.info('ai-voice', 'Audio sent to AssemblyAI', {
-                callSid,
-                packetNum: (session as any).mediaPacketCount,
-                mulawSize: mulawData.length,
-                pcmSize: pcmBuffer.length
-              });
+            // Calculate total buffered audio size
+            const totalBytes = (session as any).assemblyAIAudioBuffer.reduce((sum: number, buf: Buffer) => sum + buf.length, 0);
+
+            // Send when we have at least 100ms of audio (1600 bytes at 8kHz 16-bit)
+            if (totalBytes >= 1600) {
+              const combinedBuffer = Buffer.concat((session as any).assemblyAIAudioBuffer);
+              (session as any).assemblyAIAudioBuffer = [];
+
+              try {
+                session.transcriber.sendAudio(combinedBuffer.buffer);
+
+                // Log first few sends to verify
+                if (!(session as any).mediaPacketCount) (session as any).mediaPacketCount = 0;
+                (session as any).mediaPacketCount++;
+                if ((session as any).mediaPacketCount <= 3) {
+                  Logger.info('ai-voice', 'Audio sent to AssemblyAI', {
+                    callSid,
+                    packetNum: (session as any).mediaPacketCount,
+                    bufferSize: combinedBuffer.length,
+                    durationMs: (combinedBuffer.length / 2 / 8000 * 1000).toFixed(1)
+                  });
+                }
+              } catch (error) {
+                Logger.error('ai-voice', 'Failed to send audio to AssemblyAI', error as Error);
+              }
             }
           }
           break;
