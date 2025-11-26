@@ -1,10 +1,7 @@
 import WebSocket from 'ws';
 import fetch from 'node-fetch';
 import { Logger } from './logger.js';
-import {
-  TranscribeStreamingClient,
-  StartStreamTranscriptionCommand,
-} from '@aws-sdk/client-transcribe-streaming';
+import { RealtimeTranscriber } from 'assemblyai';
 import textToSpeech from '@google-cloud/text-to-speech';
 import alawmulawPkg from 'alawmulaw';
 const { mulaw } = alawmulawPkg;
@@ -22,7 +19,7 @@ interface ConversationSession {
   elevenlabsApiKey: string;
   conversationHistory: KindroidMessage[];
   callSid: string;
-  transcribeClient?: TranscribeStreamingClient;
+  transcriber?: RealtimeTranscriber;
   isTranscribing?: boolean;
   isAISpeaking?: boolean; // Flag to pause transcription while AI speaks
   twilioWs?: WebSocket;
@@ -45,18 +42,9 @@ export function initializeSession(
   companion: any,
   elevenlabsApiKey: string,
   kindroidApiKey: string,
-  awsRegion: string,
-  awsAccessKeyId: string,
-  awsSecretAccessKey: string
+  assemblyaiApiKey: string
 ) {
-  const transcribeClient = new TranscribeStreamingClient({
-    region: awsRegion || 'us-east-1',
-    credentials: {
-      accessKeyId: awsAccessKeyId,
-      secretAccessKey: awsSecretAccessKey,
-    }
-  });
-
+  // Note: We'll create the transcriber when the stream starts, not here
   const newSession: ConversationSession = {
     companionId: companion.id,
     kindroidBotId: companion.kindroidBotId,
@@ -65,7 +53,7 @@ export function initializeSession(
     elevenlabsApiKey,
     conversationHistory: [],
     callSid,
-    transcribeClient,
+    transcriber: undefined,
     isTranscribing: false,
     isProcessing: false,
     audioBuffer: [],
@@ -80,7 +68,7 @@ export function initializeSession(
     voiceId: newSession.voiceId,
     hasElevenlabsKey: !!newSession.elevenlabsApiKey,
     hasKindroidKey: !!newSession.kindroidApiKey,
-    hasAWSCredentials: !!awsAccessKeyId && !!awsSecretAccessKey,
+    hasAssemblyAIKey: !!assemblyaiApiKey,
   });
 }
 
@@ -419,13 +407,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
   session.twilioWs = ws;
   Logger.info('ai-voice', 'Media stream connected', { callSid });
 
-  if (!session.transcribeClient) {
-    Logger.error('ai-voice', 'AWS Transcribe client not initialized', new Error('Missing transcribe client'));
-    return;
-  }
-
   const SILENCE_THRESHOLD_MS = 2000; // 2 seconds of silence before sending batch
-  let audioChunks: Buffer[] = [];
   let transcriptionActive = false;
 
   // Helper function to send accumulated transcript batch
@@ -457,7 +439,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
     }, SILENCE_THRESHOLD_MS);
   };
 
-  // Start AWS Transcribe streaming
+  // Start AssemblyAI Realtime Transcription
   const startTranscription = async () => {
     if (transcriptionActive) return;
 
@@ -465,100 +447,77 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
     session.isTranscribing = true;
     session.accumulatedTranscript = '';
 
-    Logger.info('ai-voice', 'Starting AWS Transcribe streaming', { callSid });
-
-    // Audio stream generator for AWS Transcribe
-    const audioGenerator = async function* () {
-      try {
-        while (session.isTranscribing && audioChunks.length >= 0) {
-          if (audioChunks.length > 0) {
-            const chunk = audioChunks.shift();
-            if (chunk) {
-              yield { AudioEvent: { AudioChunk: chunk } };
-            }
-          } else {
-            // Wait a bit before checking again
-            await new Promise(resolve => setTimeout(resolve, 20));
-          }
-        }
-      } catch (error) {
-        Logger.error('ai-voice', 'Audio generator error', error as Error);
-      }
-    };
-
-    const command = new StartStreamTranscriptionCommand({
-      LanguageCode: 'en-US',
-      MediaEncoding: 'pcm',
-      MediaSampleRateHertz: 8000, // Twilio sends 8kHz mulaw
-      AudioStream: audioGenerator(),
-    });
+    Logger.info('ai-voice', 'Starting AssemblyAI Realtime Transcription', { callSid });
 
     try {
-      const response = await session.transcribeClient!.send(command);
-      Logger.info('ai-voice', 'AWS Transcribe connection opened', { callSid });
+      // Create new transcriber
+      const transcriber = new RealtimeTranscriber({
+        apiKey: process.env.ASSEMBLYAI_API_KEY!,
+        sampleRate: 8000,
+        encoding: 'pcm_s16le' // 16-bit PCM little-endian
+      });
 
-      // Start initial silence timer
-      resetSilenceTimer();
+      session.transcriber = transcriber;
 
-      // Process transcription results
-      for await (const event of response.TranscriptResultStream!) {
-        if (!session.isTranscribing) break;
+      // Set up event handlers
+      transcriber.on('open', ({ sessionId }) => {
+        Logger.info('ai-voice', 'AssemblyAI connection opened', { callSid, sessionId });
+        resetSilenceTimer();
+      });
 
-        if (event.TranscriptEvent) {
-          const results = event.TranscriptEvent.Transcript?.Results;
+      transcriber.on('transcript', (transcript) => {
+        if (!session.isTranscribing) return;
 
-          if (results && results.length > 0) {
-            for (const result of results) {
-              if (result.Alternatives && result.Alternatives.length > 0) {
-                const transcript = result.Alternatives[0].Transcript;
+        // Only process final transcripts
+        if (transcript.message_type === 'FinalTranscript') {
+          const text = transcript.text;
 
-                if (transcript && transcript.trim()) {
-                  // Speech detected - reset silence timer
-                  session.lastTranscriptTime = Date.now();
-                  resetSilenceTimer();
+          if (text && text.trim()) {
+            // Speech detected - reset silence timer
+            session.lastTranscriptTime = Date.now();
+            resetSilenceTimer();
 
-                  // Only accumulate final results
-                  if (!result.IsPartial) {
-                    session.accumulatedTranscript = (session.accumulatedTranscript || '') + transcript + ' ';
-                    Logger.info('ai-voice', 'AWS Transcribe final result', {
-                      callSid,
-                      transcript,
-                      accumulated: session.accumulatedTranscript
-                    });
-                  } else {
-                    (Logger.debug as any)('ai-voice', 'AWS Transcribe partial result', {
-                      callSid,
-                      transcript
-                    });
-                  }
-                }
-              }
-            }
+            session.accumulatedTranscript = (session.accumulatedTranscript || '') + text + ' ';
+            Logger.info('ai-voice', 'AssemblyAI final transcript', {
+              callSid,
+              transcript: text,
+              accumulated: session.accumulatedTranscript
+            });
           }
+        } else if (transcript.message_type === 'PartialTranscript') {
+          (Logger.debug as any)('ai-voice', 'AssemblyAI partial transcript', {
+            callSid,
+            transcript: transcript.text
+          });
         }
-      }
+      });
 
-      // Cleanup
-      if (session.silenceTimer) {
-        clearTimeout(session.silenceTimer);
-      }
+      transcriber.on('error', (error) => {
+        Logger.error('ai-voice', 'AssemblyAI error', error);
+      });
 
-      if (session.accumulatedTranscript && session.accumulatedTranscript.trim()) {
-        await sendBatch();
-      }
+      transcriber.on('close', async (code, reason) => {
+        Logger.info('ai-voice', 'AssemblyAI connection closed', { callSid, code, reason });
 
-      Logger.info('ai-voice', 'AWS Transcribe connection closed', { callSid });
+        // Cleanup
+        if (session.silenceTimer) {
+          clearTimeout(session.silenceTimer);
+        }
+
+        if (session.accumulatedTranscript && session.accumulatedTranscript.trim()) {
+          await sendBatch();
+        }
+
+        transcriptionActive = false;
+        session.isTranscribing = false;
+      });
+
+      // Connect to AssemblyAI
+      await transcriber.connect();
+      Logger.info('ai-voice', 'Connected to AssemblyAI', { callSid });
+
     } catch (error) {
-      Logger.error('ai-voice', 'AWS Transcribe error', error as Error);
-
-      if (session.silenceTimer) {
-        clearTimeout(session.silenceTimer);
-      }
-
-      if (session.accumulatedTranscript && session.accumulatedTranscript.trim()) {
-        await sendBatch();
-      }
-    } finally {
+      Logger.error('ai-voice', 'Failed to start AssemblyAI transcription', error as Error);
       transcriptionActive = false;
       session.isTranscribing = false;
     }
@@ -615,8 +574,8 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
           break;
 
         case 'media':
-          // Convert mulaw audio from Twilio to PCM for AWS Transcribe
-          if (data.media?.payload) {
+          // Convert mulaw audio from Twilio to PCM for AssemblyAI
+          if (data.media?.payload && session.transcriber) {
             const mulawData = Buffer.from(data.media.payload, 'base64');
 
             // Decode mulaw to 16-bit PCM (returns Int16Array)
@@ -625,19 +584,22 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
             // Convert Int16Array to Buffer
             const pcmBuffer = Buffer.from(pcmData.buffer);
 
-            // Add to audio chunks for transcription
-            audioChunks.push(pcmBuffer);
+            // Send audio directly to AssemblyAI (pass the ArrayBuffer)
+            try {
+              session.transcriber.sendAudio(pcmBuffer.buffer);
+            } catch (error) {
+              Logger.error('ai-voice', 'Failed to send audio to AssemblyAI', error as Error);
+            }
 
             // Log first few media packets to verify audio is flowing
             if (!(session as any).mediaPacketCount) (session as any).mediaPacketCount = 0;
             (session as any).mediaPacketCount++;
             if ((session as any).mediaPacketCount <= 3) {
-              Logger.info('ai-voice', 'Audio buffered for AWS Transcribe', {
+              Logger.info('ai-voice', 'Audio sent to AssemblyAI', {
                 callSid,
                 packetNum: (session as any).mediaPacketCount,
                 mulawSize: mulawData.length,
-                pcmSize: pcmBuffer.length,
-                bufferQueueSize: audioChunks.length
+                pcmSize: pcmBuffer.length
               });
             }
           }
@@ -646,6 +608,9 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
         case 'stop':
           Logger.info('ai-voice', 'Stream stopped', { callSid });
           session.isTranscribing = false;
+          if (session.transcriber) {
+            await session.transcriber.close();
+          }
           endSession(callSid);
           break;
       }
@@ -654,9 +619,12 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
     }
   });
 
-  ws.on('close', () => {
+  ws.on('close', async () => {
     Logger.info('ai-voice', 'Media stream closed', { callSid });
     session.isTranscribing = false;
+    if (session.transcriber) {
+      await session.transcriber.close();
+    }
     endSession(callSid);
   });
 
