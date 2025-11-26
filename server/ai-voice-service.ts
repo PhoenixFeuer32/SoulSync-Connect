@@ -2,7 +2,7 @@ import WebSocket from 'ws';
 import fetch from 'node-fetch';
 import { Logger } from './logger.js';
 import { storage } from './storage.js';
-import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
+import { TranscribeStreamingClient, StartStreamTranscriptionCommand } from '@aws-sdk/client-transcribe-streaming';
 import textToSpeech from '@google-cloud/text-to-speech';
 import alawmulawPkg from 'alawmulaw';
 const { mulaw } = alawmulawPkg;
@@ -28,13 +28,12 @@ interface ConversationSession {
   conversationHistory: KindroidMessage[];
   callSid: string;
   callLogId?: string; // Reference to the call log for message storage
-  deepgramConnection?: any; // Deepgram live connection
   isTranscribing?: boolean;
   isAISpeaking?: boolean; // Flag to pause transcription while AI speaks
   twilioWs?: WebSocket;
   streamSid?: string;
   isProcessing: boolean;
-  audioBuffer: Buffer[]; // Change to Buffer[] to store raw audio chunks
+  audioBuffer: Buffer[]; // Buffer for AWS Transcribe audio chunks
   initialGreetingSent: boolean; // New flag to track if greeting has been sent
   accumulatedTranscript?: string;
   lastTranscriptTime?: number;
@@ -83,7 +82,6 @@ export function initializeSession(
     conversationHistory: [],
     callSid,
     callLogId,
-    deepgramConnection: undefined,
     isTranscribing: false,
     isProcessing: false,
     audioBuffer: [],
@@ -602,7 +600,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
     }, SILENCE_THRESHOLD_MS);
   };
 
-  // Start AssemblyAI Realtime Transcription
+  // Start AWS Transcribe Realtime Transcription
   const startTranscription = async () => {
     if (transcriptionActive) return;
 
@@ -610,78 +608,86 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
     session.isTranscribing = true;
     session.accumulatedTranscript = '';
 
-    Logger.info('ai-voice', 'Starting Deepgram Streaming Transcription with Flux model', { callSid });
+    Logger.info('ai-voice', 'Starting AWS Transcribe Streaming', { callSid });
 
     try {
-      // Create Deepgram client
-      const deepgram = createClient(process.env.DEEPGRAM_API_KEY!);
-
-      // Start live transcription connection with Flux model
-      const connection = deepgram.listen.live({
-        model: 'flux-general-en',
-        language: 'en',
-        encoding: 'linear16',
-        sample_rate: 16000, // We'll upsample 8kHz to 16kHz
-        channels: 1,
-        interim_results: false, // Only final results
-        endpointing: 300, // End utterance after 300ms of silence
-        punctuate: true,
-        smart_format: true
+      // Initialize AWS Transcribe client
+      const transcribeClient = new TranscribeStreamingClient({
+        region: process.env.AWS_REGION || 'us-east-1',
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
+        }
       });
 
-      session.deepgramConnection = connection;
+      // Create audio stream (will be populated by media events)
+      const audioStream = async function* () {
+        while (session.isTranscribing && session.audioBuffer.length > 0) {
+          const audioChunk = session.audioBuffer.shift();
+          if (audioChunk) {
+            yield { AudioEvent: { AudioChunk: { Data: audioChunk } } };
+          }
+        }
+      };
 
-      // Set up event handlers
-      connection.on(LiveTranscriptionEvents.Open, () => {
-        Logger.info('ai-voice', 'Deepgram connection opened', { callSid });
-        (session as any).deepgramReady = true;
+      const command = new StartStreamTranscriptionCommand({
+        LanguageCode: 'en-US',
+        MediaSampleRateHertz: 16000,
+        MediaEncoding: 'pcm',
+        AudioStream: audioStream()
+      });
+
+      const response = await transcribeClient.send(command);
+      
+      if (response.TranscriptResultStream) {
+        Logger.info('ai-voice', 'AWS Transcribe connection established', { callSid });
+        (session as any).transcribeReady = true;
         resetSilenceTimer();
-      });
 
-      connection.on(LiveTranscriptionEvents.Transcript, (data: any) => {
-        if (!session.isTranscribing) return;
+        // Process transcription results
+        for await (const event of response.TranscriptResultStream) {
+          if (!session.isTranscribing) break;
 
-        const transcript = data.channel?.alternatives?.[0]?.transcript;
-        const isFinal = data.is_final;
+          if (event.TranscriptEvent) {
+            const results = event.TranscriptEvent.Transcript?.Results || [];
+            
+            for (const result of results) {
+              if (!result.IsPartial && result.Alternatives && result.Alternatives.length > 0) {
+                const transcript = result.Alternatives[0].Transcript;
+                
+                if (transcript && transcript.trim()) {
+                  // Speech detected - reset silence timer
+                  session.lastTranscriptTime = Date.now();
+                  resetSilenceTimer();
 
-        if (isFinal && transcript && transcript.trim()) {
-          // Speech detected - reset silence timer
-          session.lastTranscriptTime = Date.now();
-          resetSilenceTimer();
-
-          session.accumulatedTranscript = (session.accumulatedTranscript || '') + transcript + ' ';
-          Logger.info('ai-voice', 'Deepgram transcript received', {
-            callSid,
-            transcript,
-            accumulated: session.accumulatedTranscript
-          });
+                  session.accumulatedTranscript = (session.accumulatedTranscript || '') + transcript + ' ';
+                  Logger.info('ai-voice', 'AWS Transcribe result received', {
+                    callSid,
+                    transcript,
+                    accumulated: session.accumulatedTranscript
+                  });
+                }
+              }
+            }
+          }
         }
-      });
+      }
 
-      connection.on(LiveTranscriptionEvents.Error, (error: any) => {
-        Logger.error('ai-voice', 'Deepgram streaming error', error);
-      });
+      Logger.info('ai-voice', 'AWS Transcribe connection closed', { callSid });
 
-      connection.on(LiveTranscriptionEvents.Close, async () => {
-        Logger.info('ai-voice', 'Deepgram connection closed', { callSid });
+      // Cleanup
+      if (session.silenceTimer) {
+        clearTimeout(session.silenceTimer);
+      }
 
-        // Cleanup
-        if (session.silenceTimer) {
-          clearTimeout(session.silenceTimer);
-        }
+      if (session.accumulatedTranscript && session.accumulatedTranscript.trim()) {
+        await sendBatch();
+      }
 
-        if (session.accumulatedTranscript && session.accumulatedTranscript.trim()) {
-          await sendBatch();
-        }
-
-        transcriptionActive = false;
-        session.isTranscribing = false;
-      });
-
-      Logger.info('ai-voice', 'Connected to Deepgram streaming', { callSid });
-
+      transcriptionActive = false;
+      session.isTranscribing = false;
     } catch (error) {
-      Logger.error('ai-voice', 'Failed to start Deepgram transcription', error as Error);
+      Logger.error('ai-voice', 'Failed to start AWS Transcribe transcription', error as Error);
       transcriptionActive = false;
       session.isTranscribing = false;
     }
@@ -738,8 +744,8 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
           break;
 
         case 'media':
-          // Convert mulaw audio from Twilio to PCM for Deepgram
-          if (data.media?.payload && session.deepgramConnection && (session as any).deepgramReady) {
+          // Convert mulaw audio from Twilio to PCM for AWS Transcribe
+          if (data.media?.payload && (session as any).transcribeReady) {
             const mulawData = Buffer.from(data.media.payload, 'base64');
 
             // Decode mulaw to 16-bit PCM at 8kHz (returns Int16Array)
@@ -751,19 +757,20 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
             // Convert Int16Array to Buffer
             const pcmBuffer = Buffer.from(pcm16k.buffer);
 
-            // Send directly to Deepgram (no buffering needed, Deepgram handles streaming chunks)
-            session.deepgramConnection.send(pcmBuffer);
+            // Buffer audio for AWS Transcribe
+            session.audioBuffer.push(pcmBuffer);
 
             // Log first few sends to verify
             if (!(session as any).mediaPacketCount) (session as any).mediaPacketCount = 0;
             (session as any).mediaPacketCount++;
             if ((session as any).mediaPacketCount <= 3) {
-              Logger.info('ai-voice', 'Audio sent to Deepgram', {
+              Logger.info('ai-voice', 'Audio buffered for AWS Transcribe', {
                 callSid,
                 packetNum: (session as any).mediaPacketCount,
                 original8kSize: pcm8k.length * 2,
                 upsampled16kSize: pcmBuffer.length,
-                durationMs: (pcm8k.length / 8000 * 1000).toFixed(1)
+                durationMs: (pcm8k.length / 8000 * 1000).toFixed(1),
+                bufferSize: session.audioBuffer.length
               });
             }
           }
@@ -772,9 +779,6 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
         case 'stop':
           Logger.info('ai-voice', 'Stream stopped', { callSid });
           session.isTranscribing = false;
-          if (session.deepgramConnection) {
-            session.deepgramConnection.finish();
-          }
           endSession(callSid);
           break;
       }
@@ -786,9 +790,6 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
   ws.on('close', async () => {
     Logger.info('ai-voice', 'Media stream closed', { callSid });
     session.isTranscribing = false;
-    if (session.deepgramConnection) {
-      session.deepgramConnection.finish();
-    }
     endSession(callSid);
   });
 
