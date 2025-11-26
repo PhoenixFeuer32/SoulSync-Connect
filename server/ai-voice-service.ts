@@ -4,7 +4,6 @@ import { Logger } from './logger.js';
 import { StreamingTranscriber } from 'assemblyai';
 import textToSpeech from '@google-cloud/text-to-speech';
 import alawmulawPkg from 'alawmulaw';
-import VAD from 'node-vad';
 const { mulaw } = alawmulawPkg;
 
 interface KindroidMessage {
@@ -464,11 +463,6 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
 
       session.transcriber = transcriber;
 
-      // Initialize VAD for noise filtering (VERY_AGGRESSIVE mode for noisy phone audio)
-      const vad = new VAD(VAD.Mode.VERY_AGGRESSIVE);
-      (session as any).vad = vad;
-      Logger.info('ai-voice', 'VAD initialized for noise filtering', { callSid });
-
       // Set up event handlers
       transcriber.on('open', ({ id }) => {
         Logger.info('ai-voice', 'AssemblyAI streaming connection opened', { callSid, sessionId: id });
@@ -579,58 +573,44 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
           break;
 
         case 'media':
-          // Convert mulaw audio from Twilio to PCM for AssemblyAI with VAD filtering
-          if (data.media?.payload && session.transcriber && (session as any).assemblyAIReady && (session as any).vad) {
+          // Convert mulaw audio from Twilio to PCM for AssemblyAI
+          if (data.media?.payload && session.transcriber && (session as any).assemblyAIReady) {
             const mulawData = Buffer.from(data.media.payload, 'base64');
 
             // Decode mulaw to 16-bit PCM (returns Int16Array)
             const pcmData = mulaw.decode(new Uint8Array(mulawData));
 
-            // Convert Int16Array to Buffer for VAD
+            // Convert Int16Array to Buffer
             const pcmBuffer = Buffer.from(pcmData.buffer);
 
-            // Run VAD to detect speech
-            try {
-              const vad = (session as any).vad;
-              const vadResult = await vad.processAudio(pcmBuffer, 8000); // 8kHz sample rate
+            // Buffer audio chunks - AssemblyAI requires 50-1000ms chunks
+            // At 8kHz 16-bit PCM: 50ms = 800 bytes, 100ms = 1600 bytes
+            if (!(session as any).assemblyAIAudioBuffer) {
+              (session as any).assemblyAIAudioBuffer = [];
+            }
+            (session as any).assemblyAIAudioBuffer.push(pcmBuffer);
 
-              // Only process if speech is detected (not silence or noise)
-              const hasSpeech = (vadResult === VAD.Event.VOICE);
+            // Calculate total buffered audio size
+            const totalBytes = (session as any).assemblyAIAudioBuffer.reduce((sum: number, buf: Buffer) => sum + buf.length, 0);
 
-              if (hasSpeech) {
+            // Send when we have at least 100ms of audio (1600 bytes at 8kHz 16-bit)
+            if (totalBytes >= 1600) {
+              const combinedBuffer = Buffer.concat((session as any).assemblyAIAudioBuffer);
+              (session as any).assemblyAIAudioBuffer = [];
 
-                // Buffer audio chunks - AssemblyAI requires 50-1000ms chunks
-                // At 8kHz 16-bit PCM: 50ms = 800 bytes, 100ms = 1600 bytes
-                if (!(session as any).assemblyAIAudioBuffer) {
-                  (session as any).assemblyAIAudioBuffer = [];
-                }
-                (session as any).assemblyAIAudioBuffer.push(pcmBuffer);
+              session.transcriber.sendAudio(combinedBuffer.buffer);
 
-                // Calculate total buffered audio size
-                const totalBytes = (session as any).assemblyAIAudioBuffer.reduce((sum: number, buf: Buffer) => sum + buf.length, 0);
-
-                // Send when we have at least 100ms of audio (1600 bytes at 8kHz 16-bit)
-                if (totalBytes >= 1600) {
-                  const combinedBuffer = Buffer.concat((session as any).assemblyAIAudioBuffer);
-                  (session as any).assemblyAIAudioBuffer = [];
-
-                  session.transcriber.sendAudio(combinedBuffer.buffer);
-
-                  // Log first few sends to verify
-                  if (!(session as any).mediaPacketCount) (session as any).mediaPacketCount = 0;
-                  (session as any).mediaPacketCount++;
-                  if ((session as any).mediaPacketCount <= 3) {
-                    Logger.info('ai-voice', 'Speech detected, audio sent to AssemblyAI', {
-                      callSid,
-                      packetNum: (session as any).mediaPacketCount,
-                      bufferSize: combinedBuffer.length,
-                      durationMs: (combinedBuffer.length / 2 / 8000 * 1000).toFixed(1)
-                    });
-                  }
-                }
+              // Log first few sends to verify
+              if (!(session as any).mediaPacketCount) (session as any).mediaPacketCount = 0;
+              (session as any).mediaPacketCount++;
+              if ((session as any).mediaPacketCount <= 3) {
+                Logger.info('ai-voice', 'Audio sent to AssemblyAI', {
+                  callSid,
+                  packetNum: (session as any).mediaPacketCount,
+                  bufferSize: combinedBuffer.length,
+                  durationMs: (combinedBuffer.length / 2 / 8000 * 1000).toFixed(1)
+                });
               }
-            } catch (error) {
-              Logger.error('ai-voice', 'VAD processing error', error as Error);
             }
           }
           break;
