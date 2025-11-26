@@ -97,6 +97,17 @@ export const systemMetrics = pgTable("system_metrics", {
   unit: text("unit").notNull(),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 });
+// Conversation messages table - stores all AI and user messages from calls
+export const conversationMessages = pgTable("conversation_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  callLogId: varchar("call_log_id").references(() => callLogs.id).notNull(),
+  companionId: varchar("companion_id").references(() => companions.id).notNull(),
+  role: text("role").notNull(), // 'user' or 'assistant'
+  content: text("content").notNull(),
+  metadata: jsonb("metadata"), // Can store song/artist data, etc.
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
 // Add this after your existing tables (around line 60+)
 export const userThemes = pgTable("user_themes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -118,6 +129,7 @@ export const insertErrorLogSchema = createInsertSchema(errorLogs).omit({ id: tru
 export const insertFileShareSchema = createInsertSchema(fileShares).omit({ id: true, createdAt: true });
 export const insertSmsCommandSchema = createInsertSchema(smsCommands).omit({ id: true, timestamp: true });
 export const insertSystemMetricSchema = createInsertSchema(systemMetrics).omit({ id: true, timestamp: true });
+export const insertConversationMessageSchema = createInsertSchema(conversationMessages).omit({ id: true, timestamp: true });
 // Add this for theme validation- Themes
 export const insertUserThemeSchema = createInsertSchema(userThemes).omit({ id: true, createdAt: true, updatedAt: true });
 export const selectUserThemeSchema = createSelectSchema(userThemes);
@@ -139,6 +151,8 @@ export type SmsCommand = typeof smsCommands.$inferSelect;
 export type InsertSmsCommand = z.infer<typeof insertSmsCommandSchema>;
 export type SystemMetric = typeof systemMetrics.$inferSelect;
 export type InsertSystemMetric = z.infer<typeof insertSystemMetricSchema>;
+export type ConversationMessage = typeof conversationMessages.$inferSelect;
+export type InsertConversationMessage = z.infer<typeof insertConversationMessageSchema>;
 
 // Add these after your existing types (around line 110+)- Themes
 export type UserTheme = typeof userThemes.$inferSelect;

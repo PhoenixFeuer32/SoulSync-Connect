@@ -1,10 +1,18 @@
 import WebSocket from 'ws';
 import fetch from 'node-fetch';
 import { Logger } from './logger.js';
+import { storage } from './storage.js';
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import textToSpeech from '@google-cloud/text-to-speech';
 import alawmulawPkg from 'alawmulaw';
 const { mulaw } = alawmulawPkg;
+
+// Interface for extracting music metadata from Sofia's responses
+interface SongArtistMatch {
+  song: string;
+  artist: string;
+  rawMatch: string;
+}
 
 interface KindroidMessage {
   role: 'user' | 'assistant';
@@ -19,6 +27,7 @@ interface ConversationSession {
   elevenlabsApiKey: string;
   conversationHistory: KindroidMessage[];
   callSid: string;
+  callLogId?: string; // Reference to the call log for message storage
   deepgramConnection?: any; // Deepgram live connection
   isTranscribing?: boolean;
   isAISpeaking?: boolean; // Flag to pause transcription while AI speaks
@@ -61,7 +70,8 @@ export function initializeSession(
   companion: any,
   elevenlabsApiKey: string,
   kindroidApiKey: string,
-  assemblyaiApiKey: string
+  assemblyaiApiKey: string,
+  callLogId?: string
 ) {
   // Note: We'll create the transcriber when the stream starts, not here
   const newSession: ConversationSession = {
@@ -72,6 +82,7 @@ export function initializeSession(
     elevenlabsApiKey,
     conversationHistory: [],
     callSid,
+    callLogId,
     deepgramConnection: undefined,
     isTranscribing: false,
     isProcessing: false,
@@ -149,6 +160,111 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
   } catch (error) {
     Logger.error('ai-voice', `Failed to get AI response for call ${callSid}`, error as Error);
     throw error;
+  }
+}
+
+/**
+ * Detect SONG/ARTIST format in text (e.g., "SONG: Bohemian Rhapsody, ARTIST: Queen")
+ */
+export function extractSongArtist(text: string): SongArtistMatch | null {
+  // Pattern: SONG: [song name], ARTIST: [artist name]
+  const pattern = /SONG:\s*([^,]+),\s*ARTIST:\s*([^\n,]+)/i;
+  const match = text.match(pattern);
+  
+  if (match) {
+    return {
+      song: match[1].trim(),
+      artist: match[2].trim(),
+      rawMatch: match[0]
+    };
+  }
+  
+  return null;
+}
+
+/**
+ * Log conversation message and detect music metadata
+ */
+export async function logConversationMessage(
+  callSid: string,
+  callLogId: string,
+  companionId: string,
+  role: 'user' | 'assistant',
+  content: string
+): Promise<void> {
+  try {
+    // Parse metadata - check for SONG/ARTIST format if it's an assistant message
+    let metadata: any = null;
+    if (role === 'assistant') {
+      const songMatch = extractSongArtist(content);
+      if (songMatch) {
+        metadata = {
+          type: 'song_reference',
+          song: songMatch.song,
+          artist: songMatch.artist,
+          detectedAt: new Date().toISOString()
+        };
+        
+        Logger.info('ai-voice', 'Music reference detected in Sofia response', {
+          callSid,
+          song: songMatch.song,
+          artist: songMatch.artist
+        });
+      }
+    }
+
+    // Store message in database
+    await storage.createConversationMessage({
+      callLogId,
+      companionId,
+      role,
+      content,
+      metadata: metadata ? JSON.stringify(metadata) : null
+    } as any);
+
+    Logger.debug('ai-voice', 'Conversation message logged', {
+      callSid,
+      role,
+      hasMetadata: !!metadata
+    });
+  } catch (error) {
+    Logger.error('ai-voice', 'Failed to log conversation message', error as Error);
+    // Don't throw - logging errors shouldn't break the conversation
+  }
+}
+
+/**
+ * Forward music metadata to Make.com webhook
+ */
+export async function forwardToMakeWebhook(song: string, artist: string, callSid: string): Promise<void> {
+  const makeWebhookUrl = process.env.MAKE_WEBHOOK_URL;
+  
+  if (!makeWebhookUrl) {
+    Logger.warn('ai-voice', 'Make webhook URL not configured, skipping forward', { callSid, song, artist });
+    return;
+  }
+
+  try {
+    const response = await fetch(makeWebhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        song,
+        artist,
+        callSid,
+        timestamp: new Date().toISOString()
+      })
+    });
+
+    if (!response.ok) {
+      Logger.error('ai-voice', `Make webhook failed: ${response.statusText}`, new Error(`Make webhook returned ${response.status}`));
+    } else {
+      Logger.info('ai-voice', 'Successfully forwarded to Make webhook', { song, artist, callSid });
+    }
+  } catch (error) {
+    Logger.error('ai-voice', 'Failed to forward to Make webhook', error as Error);
   }
 }
 
@@ -353,8 +469,36 @@ async function processUserSpeech(callSid: string, transcript: string) {
   try {
     Logger.info('ai-voice', 'Processing user speech', { callSid, transcript });
 
+    // Log user message if we have a call log ID
+    if (session.callLogId) {
+      await logConversationMessage(
+        callSid,
+        session.callLogId,
+        session.companionId,
+        'user',
+        transcript
+      );
+    }
+
     // Get AI response from Kindroid
     const aiResponse = await getAIResponse(callSid, transcript);
+
+    // Log AI response and check for music metadata
+    if (session.callLogId) {
+      await logConversationMessage(
+        callSid,
+        session.callLogId,
+        session.companionId,
+        'assistant',
+        aiResponse
+      );
+
+      // Check for SONG/ARTIST format and forward to Make if found
+      const songMatch = extractSongArtist(aiResponse);
+      if (songMatch) {
+        await forwardToMakeWebhook(songMatch.song, songMatch.artist, callSid);
+      }
+    }
 
     // Convert to speech and send back
     await speakResponse(callSid, aiResponse);

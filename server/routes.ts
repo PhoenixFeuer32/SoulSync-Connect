@@ -383,6 +383,7 @@ async function ensureDefaultUser() {
     <Stream url="${streamUrl}">
       <Parameter name="callSid" value="${CallSid}" />
       <Parameter name="companionId" value="${activeCompanion.id}" />
+      <Parameter name="callLogId" value="${callLog.id}" />
     </Stream>
   </Connect>
   <Say voice="Polly.Joanna">The call has ended. Thank you for using SoulSync!</Say>
@@ -813,6 +814,51 @@ async function ensureDefaultUser() {
     }
   });
 
+  // Spotify playlist history endpoint
+  app.get("/api/spotify/playlist-history", async (req, res) => {
+    try {
+      // Get all conversation messages with music metadata
+      const callLogs = await storage.getCallLogs("default-user", 100);
+      const playlistEntries = [];
+
+      for (const callLog of callLogs) {
+        const messages = await storage.getConversationMessages(callLog.id, 100);
+        
+        for (const message of messages) {
+          if (message.metadata) {
+            try {
+              const metadata = typeof message.metadata === 'string' 
+                ? JSON.parse(message.metadata) 
+                : message.metadata;
+              
+              if (metadata.type === 'song_reference') {
+                playlistEntries.push({
+                  id: message.id,
+                  song: metadata.song,
+                  artist: metadata.artist,
+                  addedAt: message.timestamp || new Date().toISOString(),
+                  callId: callLog.id
+                });
+              }
+            } catch (e) {
+              // Skip invalid metadata
+            }
+          }
+        }
+      }
+
+      // Sort by date descending
+      playlistEntries.sort((a, b) => 
+        new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime()
+      );
+
+      res.json(playlistEntries);
+    } catch (error) {
+      Logger.error('api', 'Failed to fetch playlist history', error as Error);
+      res.status(500).json({ error: 'Failed to fetch playlist history' });
+    }
+  });
+
   // Periodic metrics collection
   setInterval(async () => {
     try {
@@ -931,7 +977,8 @@ async function ensureDefaultUser() {
           Logger.info('twilio', 'Media stream start event received', {
             callSid,
             streamSid: data.start.streamSid,
-            companionId: customParameters?.companionId
+            companionId: customParameters?.companionId,
+            callLogId: customParameters?.callLogId
           });
 
           // Initialize AI session if companion is configured
@@ -942,13 +989,14 @@ async function ensureDefaultUser() {
             if (companion && process.env.ELEVENLABS_API_KEY && process.env.KINDROID_API_KEY && process.env.ASSEMBLYAI_API_KEY) {
               Logger.info('twilio', 'All AI services configured, initializing session', { callSid, companionId: companion.id });
 
-              // Initialize session and store WebSocket reference
+              // Initialize session and store WebSocket reference with callLogId
               initializeSession(
                 callSid,
                 companion,
                 process.env.ELEVENLABS_API_KEY,
                 process.env.KINDROID_API_KEY,
-                process.env.ASSEMBLYAI_API_KEY
+                process.env.ASSEMBLYAI_API_KEY,
+                customParameters?.callLogId
               );
 
               // Call handleMediaStream which will set up its own message handlers

@@ -1,10 +1,11 @@
 import { 
   users, companions, apiCredentials, callLogs, errorLogs, 
-  fileShares, smsCommands, systemMetrics,
+  fileShares, smsCommands, systemMetrics, conversationMessages,
   type User, type InsertUser, type Companion, type InsertCompanion,
   type ApiCredential, type InsertApiCredential, type CallLog, type InsertCallLog,
   type ErrorLog, type InsertErrorLog, type FileShare, type InsertFileShare,
-  type SmsCommand, type InsertSmsCommand, type SystemMetric, type InsertSystemMetric
+  type SmsCommand, type InsertSmsCommand, type SystemMetric, type InsertSystemMetric,
+  type ConversationMessage, type InsertConversationMessage
 } from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, and } from "drizzle-orm";
@@ -50,6 +51,10 @@ export interface IStorage {
   // System Metrics
   getSystemMetrics(service?: string, metric?: string, limit?: number): Promise<SystemMetric[]>;
   createSystemMetric(metric: InsertSystemMetric): Promise<SystemMetric>;
+
+  // Conversation Messages
+  getConversationMessages(callLogId: string, limit?: number): Promise<ConversationMessage[]>;
+  createConversationMessage(message: InsertConversationMessage): Promise<ConversationMessage>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -93,13 +98,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteCompanion(id: string): Promise<void> {
-    // Delete related call logs first
-    await db.delete(callLogs).where(eq(callLogs.companionId, id));
-
-    // Delete related file shares
-    await db.delete(fileShares).where(eq(fileShares.companionId, id));
-
-    // Now delete the companion
     await db.delete(companions).where(eq(companions.id, id));
   }
 
@@ -236,6 +234,19 @@ export class DatabaseStorage implements IStorage {
   async createSystemMetric(metric: InsertSystemMetric): Promise<SystemMetric> {
     const [newMetric] = await db.insert(systemMetrics).values(metric).returning();
     return newMetric;
+  }
+
+  // Conversation Messages
+  async getConversationMessages(callLogId: string, limit = 100): Promise<ConversationMessage[]> {
+    return await db.select().from(conversationMessages)
+      .where(eq(conversationMessages.callLogId, callLogId))
+      .orderBy(conversationMessages.timestamp)
+      .limit(limit);
+  }
+
+  async createConversationMessage(message: InsertConversationMessage): Promise<ConversationMessage> {
+    const [newMessage] = await db.insert(conversationMessages).values(message).returning();
+    return newMessage;
   }
 }
 

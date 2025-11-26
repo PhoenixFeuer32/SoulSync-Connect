@@ -12,7 +12,6 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
-    "@deepgram/sdk": "^4.11.2",
     "@google-cloud/text-to-speech": "^6.3.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
@@ -55,6 +54,7 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.7.0",
     "alawmulaw": "^6.0.0",
+    "assemblyai": "^4.19.0",
     "autoprefixer": "^10.4.21",
     "class-variance-authority": "^0.7.1",
     "claude": "^0.1.1",
