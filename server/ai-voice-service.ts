@@ -4,7 +4,7 @@ import { Logger } from './logger.js';
 import { StreamingTranscriber } from 'assemblyai';
 import textToSpeech from '@google-cloud/text-to-speech';
 import alawmulawPkg from 'alawmulaw';
-import { NonRealTimeVAD, utils as vadUtils } from '@ricky0123/vad-node';
+import VAD from 'node-vad';
 const { mulaw } = alawmulawPkg;
 
 interface KindroidMessage {
@@ -464,8 +464,8 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
 
       session.transcriber = transcriber;
 
-      // Initialize VAD for noise filtering
-      const vad = await NonRealTimeVAD.new();
+      // Initialize VAD for noise filtering (VERY_AGGRESSIVE mode for noisy phone audio)
+      const vad = new VAD(VAD.Mode.VERY_AGGRESSIVE);
       (session as any).vad = vad;
       Logger.info('ai-voice', 'VAD initialized for noise filtering', { callSid });
 
@@ -586,28 +586,18 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
             // Decode mulaw to 16-bit PCM (returns Int16Array)
             const pcmData = mulaw.decode(new Uint8Array(mulawData));
 
-            // Convert Int16Array to Float32Array for VAD (normalized to -1 to 1)
-            const float32Audio = new Float32Array(pcmData.length);
-            for (let i = 0; i < pcmData.length; i++) {
-              float32Audio[i] = pcmData[i] / 32768.0; // Normalize int16 to float32
-            }
+            // Convert Int16Array to Buffer for VAD
+            const pcmBuffer = Buffer.from(pcmData.buffer);
 
             // Run VAD to detect speech
             try {
-              const vad = (session as any).vad as NonRealTimeVAD;
-              const vadGenerator = vad.run(float32Audio, 8000); // 8kHz sample rate
+              const vad = (session as any).vad;
+              const vadResult = await vad.processAudio(pcmBuffer, 8000); // 8kHz sample rate
 
-              // Check if any speech segments are detected
-              let hasSpeech = false;
-              for await (const speechSegment of vadGenerator) {
-                hasSpeech = true;
-                break; // We just need to know if there's any speech
-              }
+              // Only process if speech is detected (not silence or noise)
+              const hasSpeech = (vadResult === VAD.Event.VOICE);
 
-              // Only process if speech is detected
               if (hasSpeech) {
-                // Convert Int16Array to Buffer
-                const pcmBuffer = Buffer.from(pcmData.buffer);
 
                 // Buffer audio chunks - AssemblyAI requires 50-1000ms chunks
                 // At 8kHz 16-bit PCM: 50ms = 800 bytes, 100ms = 1600 bytes
