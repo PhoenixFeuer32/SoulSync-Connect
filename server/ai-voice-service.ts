@@ -1,7 +1,7 @@
 import WebSocket from 'ws';
 import fetch from 'node-fetch';
 import { Logger } from './logger.js';
-import { StreamingTranscriber } from 'assemblyai';
+import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import textToSpeech from '@google-cloud/text-to-speech';
 import alawmulawPkg from 'alawmulaw';
 const { mulaw } = alawmulawPkg;
@@ -19,7 +19,7 @@ interface ConversationSession {
   elevenlabsApiKey: string;
   conversationHistory: KindroidMessage[];
   callSid: string;
-  transcriber?: StreamingTranscriber;
+  deepgramConnection?: any; // Deepgram live connection
   isTranscribing?: boolean;
   isAISpeaking?: boolean; // Flag to pause transcription while AI speaks
   twilioWs?: WebSocket;
@@ -33,6 +33,25 @@ interface ConversationSession {
 }
 
 const sessions = new Map<string, ConversationSession>();
+
+/**
+ * Upsample PCM audio from 8kHz to 16kHz using linear interpolation
+ */
+function upsample8kTo16k(input: Int16Array): Int16Array {
+  const output = new Int16Array(input.length * 2);
+
+  for (let i = 0; i < input.length - 1; i++) {
+    output[i * 2] = input[i];
+    // Linear interpolation between samples
+    output[i * 2 + 1] = Math.round((input[i] + input[i + 1]) / 2);
+  }
+
+  // Handle last sample
+  output[output.length - 2] = input[input.length - 1];
+  output[output.length - 1] = input[input.length - 1];
+
+  return output;
+}
 
 /**
  * Initialize a conversation session for a call
@@ -53,7 +72,7 @@ export function initializeSession(
     elevenlabsApiKey,
     conversationHistory: [],
     callSid,
-    transcriber: undefined,
+    deepgramConnection: undefined,
     isTranscribing: false,
     isProcessing: false,
     audioBuffer: [],
@@ -447,56 +466,60 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
     session.isTranscribing = true;
     session.accumulatedTranscript = '';
 
-    Logger.info('ai-voice', 'Starting AssemblyAI Streaming Transcription', { callSid });
+    Logger.info('ai-voice', 'Starting Deepgram Streaming Transcription with Flux model', { callSid });
 
     try {
-      // Create new StreamingTranscriber with universal-streaming-english model
-      const transcriber = new StreamingTranscriber({
-        apiKey: process.env.ASSEMBLYAI_API_KEY!,
-        sampleRate: 8000,
-        speechModel: 'universal-streaming-english',
-        // Tune turn detection to be less aggressive
-        endOfTurnConfidenceThreshold: 0.9, // Higher = more confident before ending turn (default: 0.5)
-        minEndOfTurnSilenceWhenConfident: 2000, // Wait 1s of silence when confident (default: 500ms)
-        maxTurnSilence: 3000 // Force end turn after 2s of silence (default: 1500ms)
+      // Create Deepgram client
+      const deepgram = createClient(process.env.DEEPGRAM_API_KEY!);
+
+      // Start live transcription connection with Flux model
+      const connection = deepgram.listen.live({
+        model: 'flux-general-en',
+        language: 'en',
+        encoding: 'linear16',
+        sample_rate: 16000, // We'll upsample 8kHz to 16kHz
+        channels: 1,
+        interim_results: false, // Only final results
+        endpointing: 300, // End utterance after 300ms of silence
+        punctuate: true,
+        smart_format: true
       });
 
-      session.transcriber = transcriber;
+      session.deepgramConnection = connection;
 
       // Set up event handlers
-      transcriber.on('open', ({ id }) => {
-        Logger.info('ai-voice', 'AssemblyAI streaming connection opened', { callSid, sessionId: id });
-        (session as any).assemblyAIReady = true;
+      connection.on(LiveTranscriptionEvents.Open, () => {
+        Logger.info('ai-voice', 'Deepgram connection opened', { callSid });
+        (session as any).deepgramReady = true;
         resetSilenceTimer();
       });
 
-      transcriber.on('turn', (turn) => {
+      connection.on(LiveTranscriptionEvents.Transcript, (data: any) => {
         if (!session.isTranscribing) return;
 
-        // Only process complete turns (end_of_turn = true)
-        if (turn.end_of_turn && turn.transcript && turn.transcript.trim()) {
-          const text = turn.transcript;
+        const transcript = data.channel?.alternatives?.[0]?.transcript;
+        const isFinal = data.is_final;
 
+        if (isFinal && transcript && transcript.trim()) {
           // Speech detected - reset silence timer
           session.lastTranscriptTime = Date.now();
           resetSilenceTimer();
 
-          session.accumulatedTranscript = (session.accumulatedTranscript || '') + text + ' ';
-          Logger.info('ai-voice', 'AssemblyAI turn complete', {
+          session.accumulatedTranscript = (session.accumulatedTranscript || '') + transcript + ' ';
+          Logger.info('ai-voice', 'Deepgram transcript received', {
             callSid,
-            transcript: text,
-            accumulated: session.accumulatedTranscript,
-            turnOrder: turn.turn_order
+            transcript,
+            accumulated: session.accumulatedTranscript
           });
         }
       });
 
-      transcriber.on('error', (error: Error) => {
-        Logger.error('ai-voice', 'AssemblyAI streaming error', error);
+      connection.on(LiveTranscriptionEvents.Error, (error: any) => {
+        Logger.error('ai-voice', 'Deepgram streaming error', error);
       });
 
-      transcriber.on('close', async (code: number, reason: string) => {
-        Logger.info('ai-voice', 'AssemblyAI streaming connection closed', { callSid, code, reason });
+      connection.on(LiveTranscriptionEvents.Close, async () => {
+        Logger.info('ai-voice', 'Deepgram connection closed', { callSid });
 
         // Cleanup
         if (session.silenceTimer) {
@@ -511,12 +534,10 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
         session.isTranscribing = false;
       });
 
-      // Connect to AssemblyAI
-      await transcriber.connect();
-      Logger.info('ai-voice', 'Connected to AssemblyAI streaming', { callSid });
+      Logger.info('ai-voice', 'Connected to Deepgram streaming', { callSid });
 
     } catch (error) {
-      Logger.error('ai-voice', 'Failed to start AssemblyAI transcription', error as Error);
+      Logger.error('ai-voice', 'Failed to start Deepgram transcription', error as Error);
       transcriptionActive = false;
       session.isTranscribing = false;
     }
@@ -573,44 +594,33 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
           break;
 
         case 'media':
-          // Convert mulaw audio from Twilio to PCM for AssemblyAI
-          if (data.media?.payload && session.transcriber && (session as any).assemblyAIReady) {
+          // Convert mulaw audio from Twilio to PCM for Deepgram
+          if (data.media?.payload && session.deepgramConnection && (session as any).deepgramReady) {
             const mulawData = Buffer.from(data.media.payload, 'base64');
 
-            // Decode mulaw to 16-bit PCM (returns Int16Array)
-            const pcmData = mulaw.decode(new Uint8Array(mulawData));
+            // Decode mulaw to 16-bit PCM at 8kHz (returns Int16Array)
+            const pcm8k = mulaw.decode(new Uint8Array(mulawData));
+
+            // Upsample from 8kHz to 16kHz
+            const pcm16k = upsample8kTo16k(pcm8k);
 
             // Convert Int16Array to Buffer
-            const pcmBuffer = Buffer.from(pcmData.buffer);
+            const pcmBuffer = Buffer.from(pcm16k.buffer);
 
-            // Buffer audio chunks - AssemblyAI requires 50-1000ms chunks
-            // At 8kHz 16-bit PCM: 50ms = 800 bytes, 100ms = 1600 bytes
-            if (!(session as any).assemblyAIAudioBuffer) {
-              (session as any).assemblyAIAudioBuffer = [];
-            }
-            (session as any).assemblyAIAudioBuffer.push(pcmBuffer);
+            // Send directly to Deepgram (no buffering needed, Deepgram handles streaming chunks)
+            session.deepgramConnection.send(pcmBuffer);
 
-            // Calculate total buffered audio size
-            const totalBytes = (session as any).assemblyAIAudioBuffer.reduce((sum: number, buf: Buffer) => sum + buf.length, 0);
-
-            // Send when we have at least 100ms of audio (1600 bytes at 8kHz 16-bit)
-            if (totalBytes >= 1600) {
-              const combinedBuffer = Buffer.concat((session as any).assemblyAIAudioBuffer);
-              (session as any).assemblyAIAudioBuffer = [];
-
-              session.transcriber.sendAudio(combinedBuffer.buffer);
-
-              // Log first few sends to verify
-              if (!(session as any).mediaPacketCount) (session as any).mediaPacketCount = 0;
-              (session as any).mediaPacketCount++;
-              if ((session as any).mediaPacketCount <= 3) {
-                Logger.info('ai-voice', 'Audio sent to AssemblyAI', {
-                  callSid,
-                  packetNum: (session as any).mediaPacketCount,
-                  bufferSize: combinedBuffer.length,
-                  durationMs: (combinedBuffer.length / 2 / 8000 * 1000).toFixed(1)
-                });
-              }
+            // Log first few sends to verify
+            if (!(session as any).mediaPacketCount) (session as any).mediaPacketCount = 0;
+            (session as any).mediaPacketCount++;
+            if ((session as any).mediaPacketCount <= 3) {
+              Logger.info('ai-voice', 'Audio sent to Deepgram', {
+                callSid,
+                packetNum: (session as any).mediaPacketCount,
+                original8kSize: pcm8k.length * 2,
+                upsampled16kSize: pcmBuffer.length,
+                durationMs: (pcm8k.length / 8000 * 1000).toFixed(1)
+              });
             }
           }
           break;
@@ -618,8 +628,8 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
         case 'stop':
           Logger.info('ai-voice', 'Stream stopped', { callSid });
           session.isTranscribing = false;
-          if (session.transcriber) {
-            await session.transcriber.close();
+          if (session.deepgramConnection) {
+            session.deepgramConnection.finish();
           }
           endSession(callSid);
           break;
@@ -632,8 +642,8 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
   ws.on('close', async () => {
     Logger.info('ai-voice', 'Media stream closed', { callSid });
     session.isTranscribing = false;
-    if (session.transcriber) {
-      await session.transcriber.close();
+    if (session.deepgramConnection) {
+      session.deepgramConnection.finish();
     }
     endSession(callSid);
   });
