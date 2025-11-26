@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import fetch from 'node-fetch';
+import { Readable } from 'stream';
 import { Logger } from './logger.js';
 import { storage } from './storage.js';
 import { TranscribeStreamingClient, StartStreamTranscriptionCommand } from '@aws-sdk/client-transcribe-streaming';
@@ -620,83 +621,88 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
         }
       });
 
-      // Create audio stream (will be populated by media events)
-      const createAudioStream = async function* () {
-        while (session.isTranscribing) {
-          if (session.audioBuffer.length > 0) {
-            const audioChunk = session.audioBuffer.shift();
-            if (audioChunk) {
-              yield {
-                AudioEvent: {
-                  AudioChunk: {
-                    Data: audioChunk
-                  }
-                }
-              };
-            }
-          } else {
-            // Small delay to avoid busy waiting
-            await new Promise(resolve => setTimeout(resolve, 10));
-          }
+      // Create audio stream using Node.js Readable
+      const audioStream = new Readable({
+        read() {
+          // This is called when AWS SDK wants more data
+          // We'll push data as it arrives via media events
         }
-      };
+      });
+
+      // Store reference to stream for media handler to push data
+      (session as any).audioStream = audioStream;
 
       const command = new StartStreamTranscriptionCommand({
         LanguageCode: 'en-US',
         MediaSampleRateHertz: 16000,
         MediaEncoding: 'pcm',
-        AudioStream: createAudioStream() as any
+        AudioStream: audioStream as any
       } as any);
 
-      const response = await transcribeClient.send(command);
-      
-      if (response.TranscriptResultStream) {
-        Logger.info('ai-voice', 'AWS Transcribe connection established', { callSid });
-        (session as any).transcribeReady = true;
-        resetSilenceTimer();
+      // Start the transcription (non-blocking, will process stream events)
+      const responsePromise = transcribeClient.send(command);
 
-        // Process transcription results
-        for await (const event of response.TranscriptResultStream) {
-          if (!session.isTranscribing) break;
+      // Handle response asynchronously
+      responsePromise
+        .then(async (response) => {
+          if (response.TranscriptResultStream) {
+            Logger.info('ai-voice', 'AWS Transcribe connection established', { callSid });
+            (session as any).transcribeReady = true;
+            resetSilenceTimer();
 
-          if (event.TranscriptEvent) {
-            const results = event.TranscriptEvent.Transcript?.Results || [];
-            
-            for (const result of results) {
-              if (!result.IsPartial && result.Alternatives && result.Alternatives.length > 0) {
-                const transcript = result.Alternatives[0].Transcript;
+            // Process transcription results
+            for await (const event of response.TranscriptResultStream) {
+              if (!session.isTranscribing) break;
+
+              if (event.TranscriptEvent) {
+                const results = event.TranscriptEvent.Transcript?.Results || [];
                 
-                if (transcript && transcript.trim()) {
-                  // Speech detected - reset silence timer
-                  session.lastTranscriptTime = Date.now();
-                  resetSilenceTimer();
+                for (const result of results) {
+                  if (!result.IsPartial && result.Alternatives && result.Alternatives.length > 0) {
+                    const transcript = result.Alternatives[0].Transcript;
+                    
+                    if (transcript && transcript.trim()) {
+                      // Speech detected - reset silence timer
+                      session.lastTranscriptTime = Date.now();
+                      resetSilenceTimer();
 
-                  session.accumulatedTranscript = (session.accumulatedTranscript || '') + transcript + ' ';
-                  Logger.info('ai-voice', 'AWS Transcribe result received', {
-                    callSid,
-                    transcript,
-                    accumulated: session.accumulatedTranscript
-                  });
+                      session.accumulatedTranscript = (session.accumulatedTranscript || '') + transcript + ' ';
+                      Logger.info('ai-voice', 'AWS Transcribe result received', {
+                        callSid,
+                        transcript,
+                        accumulated: session.accumulatedTranscript
+                      });
+                    }
+                  }
                 }
               }
             }
+
+            Logger.info('ai-voice', 'AWS Transcribe connection closed', { callSid });
+
+            // Cleanup
+            if (session.silenceTimer) {
+              clearTimeout(session.silenceTimer);
+            }
+
+            if (session.accumulatedTranscript && session.accumulatedTranscript.trim()) {
+              await sendBatch();
+            }
           }
-        }
-      }
-
-      Logger.info('ai-voice', 'AWS Transcribe connection closed', { callSid });
-
-      // Cleanup
-      if (session.silenceTimer) {
-        clearTimeout(session.silenceTimer);
-      }
-
-      if (session.accumulatedTranscript && session.accumulatedTranscript.trim()) {
-        await sendBatch();
-      }
-
-      transcriptionActive = false;
-      session.isTranscribing = false;
+        })
+        .catch((error) => {
+          Logger.error('ai-voice', 'AWS Transcribe streaming error', error as Error);
+        })
+        .finally(() => {
+          transcriptionActive = false;
+          session.isTranscribing = false;
+          
+          // Close the audio stream
+          const audioStream = (session as any).audioStream;
+          if (audioStream && !audioStream.destroyed) {
+            audioStream.destroy();
+          }
+        });
     } catch (error) {
       Logger.error('ai-voice', 'Failed to start AWS Transcribe transcription', error as Error);
       transcriptionActive = false;
@@ -768,14 +774,17 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
             // Convert Int16Array to Buffer
             const pcmBuffer = Buffer.from(pcm16k.buffer);
 
-            // Buffer audio for AWS Transcribe
-            session.audioBuffer.push(pcmBuffer);
+            // Push audio directly to AWS Transcribe stream
+            const audioStream = (session as any).audioStream;
+            if (audioStream && !audioStream.destroyed) {
+              audioStream.push(pcmBuffer);
+            }
 
             // Log first few sends to verify
             if (!(session as any).mediaPacketCount) (session as any).mediaPacketCount = 0;
             (session as any).mediaPacketCount++;
             if ((session as any).mediaPacketCount <= 3) {
-              Logger.info('ai-voice', 'Audio buffered for AWS Transcribe', {
+              Logger.info('ai-voice', 'Audio pushed to AWS Transcribe stream', {
                 callSid,
                 packetNum: (session as any).mediaPacketCount,
                 original8kSize: pcm8k.length * 2,
