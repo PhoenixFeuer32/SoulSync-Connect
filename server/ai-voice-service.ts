@@ -568,7 +568,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
   session.twilioWs = ws;
   Logger.info('ai-voice', 'Media stream connected', { callSid });
 
-  const SILENCE_THRESHOLD_MS = 2000; // 2 seconds of silence before sending batch
+  const SILENCE_THRESHOLD_MS = 2500; // 2.5 seconds of silence before sending batch
   let transcriptionActive = false;
 
   // Helper function to send accumulated transcript batch
@@ -621,11 +621,22 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
       });
 
       // Create audio stream (will be populated by media events)
-      const audioStream = async function* () {
-        while (session.isTranscribing && session.audioBuffer.length > 0) {
-          const audioChunk = session.audioBuffer.shift();
-          if (audioChunk) {
-            yield { AudioEvent: { AudioChunk: { Data: audioChunk } } };
+      const createAudioStream = async function* () {
+        while (session.isTranscribing) {
+          if (session.audioBuffer.length > 0) {
+            const audioChunk = session.audioBuffer.shift();
+            if (audioChunk) {
+              yield {
+                AudioEvent: {
+                  AudioChunk: {
+                    Data: audioChunk
+                  }
+                }
+              };
+            }
+          } else {
+            // Small delay to avoid busy waiting
+            await new Promise(resolve => setTimeout(resolve, 10));
           }
         }
       };
@@ -634,8 +645,8 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
         LanguageCode: 'en-US',
         MediaSampleRateHertz: 16000,
         MediaEncoding: 'pcm',
-        AudioStream: audioStream()
-      });
+        AudioStream: createAudioStream() as any
+      } as any);
 
       const response = await transcribeClient.send(command);
       
