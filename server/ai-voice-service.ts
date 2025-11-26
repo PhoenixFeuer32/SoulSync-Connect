@@ -1,7 +1,7 @@
 import WebSocket from 'ws';
 import fetch from 'node-fetch';
 import { Logger } from './logger.js';
-import { RealtimeTranscriber } from 'assemblyai';
+import { StreamingTranscriber } from 'assemblyai';
 import textToSpeech from '@google-cloud/text-to-speech';
 import alawmulawPkg from 'alawmulaw';
 const { mulaw } = alawmulawPkg;
@@ -19,7 +19,7 @@ interface ConversationSession {
   elevenlabsApiKey: string;
   conversationHistory: KindroidMessage[];
   callSid: string;
-  transcriber?: RealtimeTranscriber;
+  transcriber?: StreamingTranscriber;
   isTranscribing?: boolean;
   isAISpeaking?: boolean; // Flag to pause transcription while AI speaks
   twilioWs?: WebSocket;
@@ -447,57 +447,52 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
     session.isTranscribing = true;
     session.accumulatedTranscript = '';
 
-    Logger.info('ai-voice', 'Starting AssemblyAI Realtime Transcription', { callSid });
+    Logger.info('ai-voice', 'Starting AssemblyAI Streaming Transcription', { callSid });
 
     try {
-      // Create new transcriber (SDK v4.19.0+ uses Universal-Streaming by default)
-      const transcriber = new RealtimeTranscriber({
+      // Create new StreamingTranscriber with universal-streaming-english model
+      const transcriber = new StreamingTranscriber({
         apiKey: process.env.ASSEMBLYAI_API_KEY!,
-        sampleRate: 8000
+        sampleRate: 8000,
+        speechModel: 'universal-streaming-english'
       });
 
       session.transcriber = transcriber;
 
       // Set up event handlers
-      transcriber.on('open', ({ sessionId }) => {
-        Logger.info('ai-voice', 'AssemblyAI connection opened', { callSid, sessionId });
+      transcriber.on('open', ({ id }) => {
+        Logger.info('ai-voice', 'AssemblyAI streaming connection opened', { callSid, sessionId: id });
         (session as any).assemblyAIReady = true;
         resetSilenceTimer();
       });
 
-      transcriber.on('transcript', (transcript) => {
+      transcriber.on('turn', (turn) => {
         if (!session.isTranscribing) return;
 
-        // Only process final transcripts
-        if (transcript.message_type === 'FinalTranscript') {
-          const text = transcript.text;
+        // Only process complete turns (end_of_turn = true)
+        if (turn.end_of_turn && turn.transcript && turn.transcript.trim()) {
+          const text = turn.transcript;
 
-          if (text && text.trim()) {
-            // Speech detected - reset silence timer
-            session.lastTranscriptTime = Date.now();
-            resetSilenceTimer();
+          // Speech detected - reset silence timer
+          session.lastTranscriptTime = Date.now();
+          resetSilenceTimer();
 
-            session.accumulatedTranscript = (session.accumulatedTranscript || '') + text + ' ';
-            Logger.info('ai-voice', 'AssemblyAI final transcript', {
-              callSid,
-              transcript: text,
-              accumulated: session.accumulatedTranscript
-            });
-          }
-        } else if (transcript.message_type === 'PartialTranscript') {
-          (Logger.debug as any)('ai-voice', 'AssemblyAI partial transcript', {
+          session.accumulatedTranscript = (session.accumulatedTranscript || '') + text + ' ';
+          Logger.info('ai-voice', 'AssemblyAI turn complete', {
             callSid,
-            transcript: transcript.text
+            transcript: text,
+            accumulated: session.accumulatedTranscript,
+            turnOrder: turn.turn_order
           });
         }
       });
 
-      transcriber.on('error', (error) => {
-        Logger.error('ai-voice', 'AssemblyAI error', error);
+      transcriber.on('error', (error: Error) => {
+        Logger.error('ai-voice', 'AssemblyAI streaming error', error);
       });
 
-      transcriber.on('close', async (code, reason) => {
-        Logger.info('ai-voice', 'AssemblyAI connection closed', { callSid, code, reason });
+      transcriber.on('close', async (code: number, reason: string) => {
+        Logger.info('ai-voice', 'AssemblyAI streaming connection closed', { callSid, code, reason });
 
         // Cleanup
         if (session.silenceTimer) {
@@ -514,7 +509,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
 
       // Connect to AssemblyAI
       await transcriber.connect();
-      Logger.info('ai-voice', 'Connected to AssemblyAI', { callSid });
+      Logger.info('ai-voice', 'Connected to AssemblyAI streaming', { callSid });
 
     } catch (error) {
       Logger.error('ai-voice', 'Failed to start AssemblyAI transcription', error as Error);
