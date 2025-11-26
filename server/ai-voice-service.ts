@@ -461,6 +461,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
       // Set up event handlers
       transcriber.on('open', ({ sessionId }) => {
         Logger.info('ai-voice', 'AssemblyAI connection opened', { callSid, sessionId });
+        (session as any).assemblyAIReady = true;
         resetSilenceTimer();
       });
 
@@ -574,7 +575,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
 
         case 'media':
           // Convert mulaw audio from Twilio to PCM for AssemblyAI
-          if (data.media?.payload && session.transcriber) {
+          if (data.media?.payload && session.transcriber && (session as any).assemblyAIReady) {
             const mulawData = Buffer.from(data.media.payload, 'base64');
 
             // Decode mulaw to 16-bit PCM (returns Int16Array)
