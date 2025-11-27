@@ -424,7 +424,7 @@ export function handleMediaStream(ws: WebSocket, callSid: string) {
     return;
   }
 
-  const SILENCE_THRESHOLD_MS = 2000; // 2 seconds of silence before sending batch
+  const SILENCE_THRESHOLD_MS = 2500; // 2.5 seconds of silence before sending batch
   let audioChunks: Buffer[] = [];
   let transcriptionActive = false;
 
