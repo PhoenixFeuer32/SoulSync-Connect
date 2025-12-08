@@ -138,6 +138,69 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
       aiResponse: aiResponse.substring(0, 50)
     });
 
+    // Detect if Sofia wants to add a song to Spotify
+    // Support both "SONG: X, ARTIST: Y" and "ARTIST: Y, SONG: X" formats
+    const songFirstPattern = /SONG[:\s]+(.+?),\s*ARTIST[:\s]+(.+)/i;
+    const artistFirstPattern = /ARTIST[:\s]+(.+?),\s*SONG[:\s]+(.+)/i;
+
+    let trackName: string | null = null;
+    let artistName: string | null = null;
+
+    const songFirstMatch = aiResponse.match(songFirstPattern);
+    const artistFirstMatch = aiResponse.match(artistFirstPattern);
+
+    if (songFirstMatch) {
+      trackName = songFirstMatch[1].trim();
+      artistName = songFirstMatch[2].trim();
+    } else if (artistFirstMatch) {
+      artistName = artistFirstMatch[1].trim();
+      trackName = artistFirstMatch[2].trim();
+    }
+
+    if (trackName && artistName) {
+
+      Logger.info('ai-voice', 'Sofia requested Spotify track', {
+        callSid,
+        trackName,
+        artistName
+      });
+
+      // Forward to Make webhook
+      try {
+        const makeWebhookUrl = process.env.MAKE_WEBHOOK_URL;
+        if (!makeWebhookUrl) {
+          Logger.error('ai-voice', 'MAKE_WEBHOOK_URL not configured', new Error('Missing environment variable'));
+        } else {
+          const webhookResponse = await fetch(makeWebhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              trackName,
+              artistName,
+              timestamp: new Date().toISOString(),
+              callSid,
+              companionId: session.companionId
+            })
+          });
+
+          if (!webhookResponse.ok) {
+            Logger.error('ai-voice', 'Make webhook request failed', new Error(`HTTP ${webhookResponse.status}: ${webhookResponse.statusText}`));
+          } else {
+            Logger.info('ai-voice', 'Successfully forwarded to Make webhook', {
+              callSid,
+              trackName,
+              artistName,
+              status: webhookResponse.status
+            });
+          }
+        }
+      } catch (webhookError) {
+        Logger.error('ai-voice', 'Failed to call Make webhook', webhookError as Error);
+      }
+    }
+
     return aiResponse;
   } catch (error) {
     Logger.error('ai-voice', `Failed to get AI response for call ${callSid}`, error as Error);
