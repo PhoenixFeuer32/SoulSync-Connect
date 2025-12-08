@@ -140,8 +140,9 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
 
     // Detect if Sofia wants to add a song to Spotify
     // Support both "SONG: X, ARTIST: Y" and "ARTIST: Y, SONG: X" formats
-    const songFirstPattern = /SONG[:\s]+(.+?),\s*ARTIST[:\s]+(.+)/i;
-    const artistFirstPattern = /ARTIST[:\s]+(.+?),\s*SONG[:\s]+(.+)/i;
+    // Comma is optional between the two fields
+    const songFirstPattern = /SONG[:\s]+(.+?),?\s*ARTIST[:\s]+(.+)/i;
+    const artistFirstPattern = /ARTIST[:\s]+(.+?),?\s*SONG[:\s]+(.+)/i;
 
     let trackName: string | null = null;
     let artistName: string | null = null;
