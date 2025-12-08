@@ -149,6 +149,14 @@ export async function getAIResponse(callSid: string, userMessage: string): Promi
     const songFirstMatch = aiResponse.match(songFirstPattern);
     const artistFirstMatch = aiResponse.match(artistFirstPattern);
 
+    // Log full response for debugging pattern matching
+    Logger.info('ai-voice', 'Checking for song pattern', {
+      callSid,
+      fullResponse: aiResponse,
+      hasSongFirstMatch: !!songFirstMatch,
+      hasArtistFirstMatch: !!artistFirstMatch
+    });
+
     if (songFirstMatch) {
       trackName = songFirstMatch[1].trim();
       artistName = songFirstMatch[2].trim();
