@@ -356,12 +356,12 @@ export default function SpotifyIntegration() {
                   <i className="fas fa-play mr-2"></i>
                   Share Now Playing
                 </Button>
-                
+
                 <Button className="w-full" variant="outline" data-testid="button-create-session-playlist">
                   <i className="fas fa-plus mr-2"></i>
                   Create Session Playlist
                 </Button>
-                
+
                 <Button className="w-full" variant="outline" data-testid="button-sync-library">
                   <i className="fas fa-sync mr-2"></i>
                   Sync Library
@@ -370,6 +370,64 @@ export default function SpotifyIntegration() {
             </Card>
           </div>
         </div>
+      )}
+
+      {/* Sofia's Music Choices */}
+      {spotifyCredentials && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Sofia's Music Choices</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Songs Sofia has added to your shared playlist
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open('https://open.spotify.com/search/Kindroid%20List', '_blank')}
+                data-testid="button-open-kindroid-playlist"
+              >
+                <i className="fab fa-spotify mr-2"></i>
+                Open in Spotify
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {/* This will be populated with real data from the Kindroid List playlist */}
+              <div className="text-center py-8 bg-muted/30 rounded-lg border-2 border-dashed">
+                <i className="fas fa-music text-4xl text-muted-foreground mb-4"></i>
+                <p className="text-muted-foreground mb-2">No songs added yet</p>
+                <p className="text-sm text-muted-foreground">
+                  Sofia can add songs by saying "SONG: [name], ARTIST: [artist]" during your calls
+                </p>
+              </div>
+
+              {/* Example of how tracks will appear once added */}
+              {/* Uncomment when playlist data is available
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-chart-4 rounded flex items-center justify-center">
+                      <i className="fas fa-music text-white text-sm"></i>
+                    </div>
+                    <div>
+                      <p className="font-medium">Different Worlds</p>
+                      <p className="text-sm text-muted-foreground">Sofia Carson</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Added by Sofia</p>
+                    <p className="text-xs text-muted-foreground">2 hours ago</p>
+                  </div>
+                </div>
+              </div>
+              */}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
