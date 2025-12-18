@@ -26,6 +26,20 @@ interface SpotifyPlaylist {
   image?: string;
 }
 
+interface KindroidListTrack {
+  id: string;
+  name: string;
+  artist: string;
+  album: string;
+  addedAt: string;
+  duration: number;
+  imageUrl?: string;
+}
+
+interface KindroidListResponse {
+  tracks: KindroidListTrack[];
+}
+
 export default function SpotifyIntegration() {
   const [isConnected, setIsConnected] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,6 +61,12 @@ export default function SpotifyIntegration() {
   const { data: recentTracks } = useQuery({
     queryKey: ["/api/spotify/recent-tracks"],
     enabled: !!spotifyCredentials
+  });
+
+  const { data: kindroidListData, isLoading: kindroidListLoading } = useQuery<KindroidListResponse>({
+    queryKey: ["/api/spotify/kindroid-list"],
+    enabled: !!spotifyCredentials,
+    refetchInterval: 30000 // Refresh every 30 seconds
   });
 
   const connectSpotifyMutation = useMutation({
@@ -395,8 +415,53 @@ export default function SpotifyIntegration() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {/* This will be populated with real data from the Kindroid List playlist */}
+            {kindroidListLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-sm text-muted-foreground mt-4">Loading Sofia's music choices...</p>
+              </div>
+            ) : kindroidListData?.tracks && kindroidListData.tracks.length > 0 ? (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {kindroidListData.tracks.map((track: any) => {
+                  const addedDate = new Date(track.addedAt);
+                  const now = new Date();
+                  const diffMs = now.getTime() - addedDate.getTime();
+                  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                  let timeAgo = '';
+                  if (diffDays > 0) {
+                    timeAgo = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                  } else if (diffHours > 0) {
+                    timeAgo = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                  } else {
+                    timeAgo = 'Just now';
+                  }
+
+                  return (
+                    <div key={track.id} className="flex items-center justify-between p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        {track.imageUrl ? (
+                          <img src={track.imageUrl} alt={track.name} className="w-10 h-10 rounded object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 bg-chart-4 rounded flex items-center justify-center">
+                            <i className="fas fa-music text-white text-sm"></i>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{track.name}</p>
+                          <p className="text-sm text-muted-foreground truncate">{track.artist}</p>
+                        </div>
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="text-xs text-chart-4 font-medium">Added by Sofia</p>
+                        <p className="text-xs text-muted-foreground">{timeAgo}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
               <div className="text-center py-8 bg-muted/30 rounded-lg border-2 border-dashed">
                 <i className="fas fa-music text-4xl text-muted-foreground mb-4"></i>
                 <p className="text-muted-foreground mb-2">No songs added yet</p>
@@ -404,28 +469,7 @@ export default function SpotifyIntegration() {
                   Sofia can add songs by saying "SONG: [name], ARTIST: [artist]" during your calls
                 </p>
               </div>
-
-              {/* Example of how tracks will appear once added */}
-              {/* Uncomment when playlist data is available
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-chart-4 rounded flex items-center justify-center">
-                      <i className="fas fa-music text-white text-sm"></i>
-                    </div>
-                    <div>
-                      <p className="font-medium">Different Worlds</p>
-                      <p className="text-sm text-muted-foreground">Sofia Carson</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Added by Sofia</p>
-                    <p className="text-xs text-muted-foreground">2 hours ago</p>
-                  </div>
-                </div>
-              </div>
-              */}
-            </div>
+            )}
           </CardContent>
         </Card>
       )}

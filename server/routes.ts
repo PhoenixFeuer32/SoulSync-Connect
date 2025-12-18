@@ -713,6 +713,197 @@ async function ensureDefaultUser() {
   });
   // --- END THEME ROUTES ---
 
+  // --- SPOTIFY ROUTES ---
+  // Helper function to get Spotify access token
+  async function getSpotifyAccessToken(userId: string = "default-user"): Promise<string | null> {
+    try {
+      const spotifyCredential = await db.select()
+        .from(schema.apiCredentials)
+        .where(and(
+          eq(schema.apiCredentials.userId, userId),
+          eq(schema.apiCredentials.service, 'spotify'),
+          eq(schema.apiCredentials.isActive, true)
+        ))
+        .limit(1);
+
+      if (spotifyCredential.length === 0) {
+        return null;
+      }
+
+      const clientId = decrypt(spotifyCredential[0].encryptedKey);
+      const clientSecret = decrypt(spotifyCredential[0].encryptedSecret || '');
+
+      // Get Spotify API token
+      const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Basic ' + Buffer.from(clientId + ':' + clientSecret).toString('base64')
+        },
+        body: 'grant_type=client_credentials'
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error('Failed to get Spotify token');
+      }
+
+      const tokenData = await tokenResponse.json() as { access_token: string };
+      return tokenData.access_token;
+    } catch (error) {
+      Logger.error('spotify', 'Failed to get access token', error as Error);
+      return null;
+    }
+  }
+
+  // Get Kindroid List playlist tracks (Sofia's music choices)
+  app.get("/api/spotify/kindroid-list", async (req, res) => {
+    try {
+      const accessToken = await getSpotifyAccessToken();
+
+      if (!accessToken) {
+        return res.status(401).json({ error: 'Spotify not connected' });
+      }
+
+      // Search for "Kindroid List" playlist
+      const searchResponse = await fetch(
+        `https://api.spotify.com/v1/search?q=${encodeURIComponent('Kindroid List')}&type=playlist&limit=1`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (!searchResponse.ok) {
+        throw new Error('Failed to search for playlist');
+      }
+
+      const searchData = await searchResponse.json() as any;
+      const playlist = searchData.playlists?.items?.[0];
+
+      if (!playlist) {
+        return res.json({ tracks: [] });
+      }
+
+      // Get playlist tracks
+      const tracksResponse = await fetch(
+        `https://api.spotify.com/v1/playlists/${playlist.id}/tracks?limit=50`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (!tracksResponse.ok) {
+        throw new Error('Failed to get playlist tracks');
+      }
+
+      const tracksData = await tracksResponse.json() as any;
+
+      // Format the tracks
+      const tracks = tracksData.items?.map((item: any) => ({
+        id: item.track.id,
+        name: item.track.name,
+        artist: item.track.artists[0]?.name || 'Unknown Artist',
+        album: item.track.album?.name || 'Unknown Album',
+        addedAt: item.added_at,
+        duration: item.track.duration_ms,
+        imageUrl: item.track.album?.images?.[0]?.url
+      })) || [];
+
+      Logger.info('spotify', 'Fetched Kindroid List tracks', { count: tracks.length });
+      res.json({ tracks });
+    } catch (error) {
+      Logger.error('spotify', 'Failed to fetch Kindroid List', error as Error);
+      res.status(500).json({ error: 'Failed to fetch playlist' });
+    }
+  });
+
+  // Get user's playlists
+  app.get("/api/spotify/playlists", async (req, res) => {
+    try {
+      const accessToken = await getSpotifyAccessToken();
+
+      if (!accessToken) {
+        return res.status(401).json({ error: 'Spotify not connected' });
+      }
+
+      // For client credentials flow, we can't get user playlists
+      // Return empty for now - would need OAuth flow for user-specific data
+      res.json({ items: [] });
+    } catch (error) {
+      Logger.error('spotify', 'Failed to fetch playlists', error as Error);
+      res.status(500).json({ error: 'Failed to fetch playlists' });
+    }
+  });
+
+  // Get recently played tracks
+  app.get("/api/spotify/recent-tracks", async (req, res) => {
+    try {
+      const accessToken = await getSpotifyAccessToken();
+
+      if (!accessToken) {
+        return res.status(401).json({ error: 'Spotify not connected' });
+      }
+
+      // For client credentials flow, we can't get user's recently played
+      // Return empty for now - would need OAuth flow for user-specific data
+      res.json({ items: [] });
+    } catch (error) {
+      Logger.error('spotify', 'Failed to fetch recent tracks', error as Error);
+      res.status(500).json({ error: 'Failed to fetch recent tracks' });
+    }
+  });
+
+  // Search for tracks
+  app.get("/api/spotify/search", async (req, res) => {
+    try {
+      const { q } = req.query;
+
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ error: 'Search query required' });
+      }
+
+      const accessToken = await getSpotifyAccessToken();
+
+      if (!accessToken) {
+        return res.status(401).json({ error: 'Spotify not connected' });
+      }
+
+      const searchResponse = await fetch(
+        `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (!searchResponse.ok) {
+        throw new Error('Search failed');
+      }
+
+      const searchData = await searchResponse.json() as any;
+
+      // Format the tracks
+      const tracks = searchData.tracks?.items?.map((track: any) => ({
+        id: track.id,
+        name: track.name,
+        artist: track.artists[0]?.name || 'Unknown Artist',
+        album: track.album?.name || 'Unknown Album',
+        duration: track.duration_ms,
+        preview_url: track.preview_url
+      })) || [];
+
+      res.json({ tracks: { items: tracks } });
+    } catch (error) {
+      Logger.error('spotify', 'Search failed', error as Error);
+      res.status(500).json({ error: 'Search failed' });
+    }
+  });
+  // --- END SPOTIFY ROUTES ---
+
   // Debug endpoints - temporary
   app.get("/debug/users", async (req, res) => {
     // ...debug code...

@@ -46,7 +46,7 @@
 
 ## 🚧 In Progress / Needs Testing
 
-- [ ] **Test Make scenario after work**
+- [x] **Test Make scenario after work**
   - End-to-end test of full workflow: Sofia responds with SONG/ARTIST → webhook to Make → Spotify playlist updated → UI reflects new entry
   - AWS Transcribe now properly streaming audio via Node.js Readable stream with async result processing
 
