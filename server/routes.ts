@@ -1146,10 +1146,26 @@ async function ensureDefaultUser() {
       }
 
       // Get companion's Kindroid credentials
+      // Bot ID comes from companions table, API key comes from apiCredentials table
       const userId = 'default-user';
       let kindroidBotId: string | null = null;
       let kindroidApiKey: string | null = null;
 
+      // Step 1: Get the API key from apiCredentials (service='kindroid')
+      const kindroidCred = await db.select()
+        .from(schema.apiCredentials)
+        .where(and(
+          eq(schema.apiCredentials.userId, userId),
+          eq(schema.apiCredentials.service, 'kindroid'),
+          eq(schema.apiCredentials.isActive, true)
+        ))
+        .limit(1);
+
+      if (kindroidCred.length > 0) {
+        kindroidApiKey = decrypt(kindroidCred[0].encryptedKey);
+      }
+
+      // Step 2: Get the Bot ID from companions table
       if (companionId) {
         // Get from specific companion
         const companion = await db.select()
@@ -1157,13 +1173,12 @@ async function ensureDefaultUser() {
           .where(eq(schema.companions.id, companionId))
           .limit(1);
 
-        if (companion.length > 0 && companion[0].kindroidBotId && companion[0].kindroidApiKey) {
+        if (companion.length > 0 && companion[0].kindroidBotId) {
           kindroidBotId = companion[0].kindroidBotId;
-          kindroidApiKey = decrypt(companion[0].kindroidApiKey);
         }
       }
 
-      if (!kindroidBotId || !kindroidApiKey) {
+      if (!kindroidBotId) {
         // Try to get from active companion
         const activeCompanion = await db.select()
           .from(schema.companions)
@@ -1173,44 +1188,22 @@ async function ensureDefaultUser() {
           ))
           .limit(1);
 
-        if (activeCompanion.length > 0 && activeCompanion[0].kindroidBotId && activeCompanion[0].kindroidApiKey) {
+        if (activeCompanion.length > 0 && activeCompanion[0].kindroidBotId) {
           kindroidBotId = activeCompanion[0].kindroidBotId;
-          kindroidApiKey = decrypt(activeCompanion[0].kindroidApiKey);
         }
       }
 
-      if (!kindroidBotId || !kindroidApiKey) {
-        // Try ANY companion with Kindroid credentials (not just active)
+      if (!kindroidBotId) {
+        // Try ANY companion with a Bot ID (not just active)
         const anyCompanion = await db.select()
           .from(schema.companions)
           .where(eq(schema.companions.userId, userId))
           .limit(10);
 
         for (const comp of anyCompanion) {
-          if (comp.kindroidBotId && comp.kindroidApiKey) {
+          if (comp.kindroidBotId) {
             kindroidBotId = comp.kindroidBotId;
-            kindroidApiKey = decrypt(comp.kindroidApiKey);
             break;
-          }
-        }
-      }
-
-      if (!kindroidBotId || !kindroidApiKey) {
-        // Fall back to API credentials for API key + look for bot ID elsewhere
-        const kindroidCred = await db.select()
-          .from(schema.apiCredentials)
-          .where(and(
-            eq(schema.apiCredentials.userId, userId),
-            eq(schema.apiCredentials.service, 'kindroid'),
-            eq(schema.apiCredentials.isActive, true)
-          ))
-          .limit(1);
-
-        if (kindroidCred.length > 0) {
-          kindroidApiKey = decrypt(kindroidCred[0].encryptedKey);
-          // Check if encryptedSecret has the bot ID
-          if (kindroidCred[0].encryptedSecret) {
-            kindroidBotId = decrypt(kindroidCred[0].encryptedSecret);
           }
         }
       }
@@ -1373,24 +1366,38 @@ async function ensureDefaultUser() {
       }
 
       // Now share with Kindroid
+      // Bot ID comes from companions table, API key comes from apiCredentials table
       const userId = 'default-user';
       let kindroidBotId: string | null = null;
       let kindroidApiKey: string | null = null;
 
-      // Get Kindroid credentials (same logic as share-with-kindroid endpoint)
+      // Step 1: Get the API key from apiCredentials (service='kindroid')
+      const kindroidCred = await db.select()
+        .from(schema.apiCredentials)
+        .where(and(
+          eq(schema.apiCredentials.userId, userId),
+          eq(schema.apiCredentials.service, 'kindroid'),
+          eq(schema.apiCredentials.isActive, true)
+        ))
+        .limit(1);
+
+      if (kindroidCred.length > 0) {
+        kindroidApiKey = decrypt(kindroidCred[0].encryptedKey);
+      }
+
+      // Step 2: Get the Bot ID from companions table
       if (companionId) {
         const companion = await db.select()
           .from(schema.companions)
           .where(eq(schema.companions.id, companionId))
           .limit(1);
 
-        if (companion.length > 0 && companion[0].kindroidBotId && companion[0].kindroidApiKey) {
+        if (companion.length > 0 && companion[0].kindroidBotId) {
           kindroidBotId = companion[0].kindroidBotId;
-          kindroidApiKey = decrypt(companion[0].kindroidApiKey);
         }
       }
 
-      if (!kindroidBotId || !kindroidApiKey) {
+      if (!kindroidBotId) {
         const activeCompanion = await db.select()
           .from(schema.companions)
           .where(and(
@@ -1399,9 +1406,8 @@ async function ensureDefaultUser() {
           ))
           .limit(1);
 
-        if (activeCompanion.length > 0 && activeCompanion[0].kindroidBotId && activeCompanion[0].kindroidApiKey) {
+        if (activeCompanion.length > 0 && activeCompanion[0].kindroidBotId) {
           kindroidBotId = activeCompanion[0].kindroidBotId;
-          kindroidApiKey = decrypt(activeCompanion[0].kindroidApiKey);
         }
       }
 

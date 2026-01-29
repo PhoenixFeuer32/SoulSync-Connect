@@ -18,7 +18,6 @@ interface CompanionForm {
   voiceId: string;
   voiceProvider: string;
   kindroidBotId: string;
-  kindroidApiKey: string;
 }
 
 interface Companion {
@@ -29,7 +28,6 @@ interface Companion {
   voiceId?: string;
   voiceProvider?: string;
   kindroidBotId?: string;
-  kindroidApiKey?: string;
   isActive: boolean;
   createdAt: string;
 }
@@ -151,7 +149,6 @@ export default function Companions() {
     setValue("voiceId", companion.voiceId || "");
     setValue("voiceProvider", companion.voiceProvider || "elevenlabs");
     setValue("kindroidBotId", companion.kindroidBotId || "");
-    setValue("kindroidApiKey", ""); // Don't pre-fill API key for security
     setIsDialogOpen(true);
   };
 
@@ -269,22 +266,6 @@ export default function Companions() {
                 </p>
               </div>
 
-              <div>
-                <Label htmlFor="kindroidApiKey">Kindroid API Key</Label>
-                <Input
-                  id="kindroidApiKey"
-                  type="password"
-                  {...register("kindroidApiKey", { required: !editingCompanion ? "Kindroid API Key is required" : false })}
-                  placeholder={editingCompanion ? "Leave blank to keep existing" : "Enter Kindroid API Key"}
-                  data-testid="input-kindroid-api-key"
-                />
-                {errors.kindroidApiKey && (
-                  <p className="text-sm text-destructive mt-1">{errors.kindroidApiKey.message}</p>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  {editingCompanion ? "Leave blank to keep the existing API key" : "Your Kindroid API key for authentication"}
-                </p>
-              </div>
 
               <div className="flex justify-end space-x-2">
                 <Button

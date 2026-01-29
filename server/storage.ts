@@ -8,7 +8,6 @@ import {
 } from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, and } from "drizzle-orm";
-import { encrypt } from "./encryption.js";
 
 export interface IStorage {
   // Users
@@ -81,24 +80,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCompanion(companion: InsertCompanion): Promise<Companion> {
-    // Encrypt kindroidApiKey if provided
-    const dataToInsert = { ...companion };
-    if (dataToInsert.kindroidApiKey) {
-      dataToInsert.kindroidApiKey = encrypt(dataToInsert.kindroidApiKey);
-    }
-    const [newCompanion] = await db.insert(companions).values(dataToInsert).returning();
+    const [newCompanion] = await db.insert(companions).values(companion).returning();
     return newCompanion;
   }
 
   async updateCompanion(id: string, companion: Partial<InsertCompanion>): Promise<Companion> {
-    // Encrypt kindroidApiKey if provided, otherwise remove it from update to keep existing
-    const dataToUpdate: any = { ...companion, updatedAt: new Date() };
-    if (dataToUpdate.kindroidApiKey && dataToUpdate.kindroidApiKey.trim() !== '') {
-      dataToUpdate.kindroidApiKey = encrypt(dataToUpdate.kindroidApiKey);
-    } else {
-      // Remove empty kindroidApiKey to keep existing value
-      delete dataToUpdate.kindroidApiKey;
-    }
+    const dataToUpdate = { ...companion, updatedAt: new Date() };
     const [updated] = await db.update(companions)
       .set(dataToUpdate)
       .where(eq(companions.id, id))
