@@ -1,0 +1,48 @@
+# Dependencies
+node_modules
+npm-debug.log
+package-lock.json
+
+# Development files
+.env
+.env.local
+.env.*.local
+*.log
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts (will be built in container)
+dist
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Documentation
+*.md
+!README.md
+
+# Render config
+render.yaml
+
+# Uploads (if you want to exclude - optional)
+# uploads
+
+# Other
+.replit
+attached_assets
+logs
+.local

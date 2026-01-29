@@ -15,6 +15,13 @@ import fs from "fs/promises";
 import fetch from "node-fetch"; // Lets you make HTTP requests from Node.js
 import { eq, and } from "drizzle-orm";
 import { handleMediaStream, initializeSession } from "./ai-voice-service.js";
+import {
+  translateToNaturalLanguage,
+  detectSongMention,
+  analyzeWavFile,
+  formatForKindroid,
+  type SpotifyAudioFeatures
+} from "./music-translator.js";
 
 const galaxyApiKey = process.env.GALAXY_THEME_API_KEY;
 const windowsApiKey = process.env.WINDOWS_THEME_API_KEY;
@@ -902,7 +909,530 @@ async function ensureDefaultUser() {
       res.status(500).json({ error: 'Search failed' });
     }
   });
+
+  // Get audio features for a track (for music translation)
+  app.get("/api/spotify/audio-features/:trackId", async (req, res) => {
+    try {
+      const { trackId } = req.params;
+
+      if (!trackId) {
+        return res.status(400).json({ error: 'Track ID required' });
+      }
+
+      const accessToken = await getSpotifyAccessToken();
+
+      if (!accessToken) {
+        return res.status(401).json({ error: 'Spotify not connected' });
+      }
+
+      // Get audio features from Spotify
+      const featuresResponse = await fetch(
+        `https://api.spotify.com/v1/audio-features/${trackId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (!featuresResponse.ok) {
+        throw new Error('Failed to get audio features');
+      }
+
+      const features = await featuresResponse.json() as any;
+
+      // Also get track info for name and artist
+      const trackResponse = await fetch(
+        `https://api.spotify.com/v1/tracks/${trackId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (!trackResponse.ok) {
+        throw new Error('Failed to get track info');
+      }
+
+      const track = await trackResponse.json() as any;
+
+      Logger.info('spotify', 'Fetched audio features', { trackId, trackName: track.name });
+
+      res.json({
+        track: {
+          id: track.id,
+          name: track.name,
+          artist: track.artists[0]?.name || 'Unknown Artist',
+          album: track.album?.name || 'Unknown Album',
+          imageUrl: track.album?.images?.[0]?.url
+        },
+        features: {
+          tempo: features.tempo,
+          key: features.key,
+          mode: features.mode,
+          valence: features.valence,
+          energy: features.energy,
+          danceability: features.danceability,
+          acousticness: features.acousticness,
+          instrumentalness: features.instrumentalness,
+          speechiness: features.speechiness,
+          liveness: features.liveness,
+          loudness: features.loudness
+        }
+      });
+    } catch (error) {
+      Logger.error('spotify', 'Failed to get audio features', error as Error);
+      res.status(500).json({ error: 'Failed to get audio features' });
+    }
+  });
   // --- END SPOTIFY ROUTES ---
+
+  // --- MUSIC SHARING ROUTES (Kindroid "Ears") ---
+
+  // Analyze a WAV file and get audio features
+  app.post("/api/music/analyze-wav", upload.single('audio'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No audio file provided' });
+      }
+
+      const filePath = req.file.path;
+      const trackName = req.body.trackName || req.file.originalname || 'Unknown Track';
+      const artist = req.body.artist || 'Phoenix';
+
+      // Analyze the WAV file
+      const features = await analyzeWavFile(filePath);
+
+      // Translate to natural language
+      const description = translateToNaturalLanguage(features, trackName, artist);
+
+      Logger.info('music', 'Analyzed WAV file', {
+        trackName,
+        artist,
+        tempo: features.tempo,
+        energy: features.energy,
+        valence: features.valence
+      });
+
+      // Clean up the uploaded file after analysis
+      await fs.unlink(filePath).catch(() => {});
+
+      res.json({
+        trackName,
+        artist,
+        features,
+        description
+      });
+    } catch (error) {
+      Logger.error('music', 'Failed to analyze WAV file', error as Error);
+      res.status(500).json({ error: 'Failed to analyze audio file' });
+    }
+  });
+
+  // Detect song mention in text and get features
+  app.post("/api/music/detect-song", async (req, res) => {
+    try {
+      const { message } = req.body;
+
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: 'Message text required' });
+      }
+
+      // Try to detect a song mention
+      const detected = detectSongMention(message);
+
+      if (!detected) {
+        return res.json({ detected: false });
+      }
+
+      // Search Spotify for the track
+      const accessToken = await getSpotifyAccessToken();
+
+      if (!accessToken) {
+        return res.json({
+          detected: true,
+          song: detected.song,
+          artist: detected.artist,
+          spotifyFound: false,
+          message: 'Spotify not connected - cannot fetch audio features'
+        });
+      }
+
+      // Search for the track on Spotify
+      const searchQuery = `${detected.song} ${detected.artist}`;
+      const searchResponse = await fetch(
+        `https://api.spotify.com/v1/search?q=${encodeURIComponent(searchQuery)}&type=track&limit=1`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (!searchResponse.ok) {
+        throw new Error('Spotify search failed');
+      }
+
+      const searchData = await searchResponse.json() as any;
+      const track = searchData.tracks?.items?.[0];
+
+      if (!track) {
+        return res.json({
+          detected: true,
+          song: detected.song,
+          artist: detected.artist,
+          spotifyFound: false
+        });
+      }
+
+      // Get audio features
+      const featuresResponse = await fetch(
+        `https://api.spotify.com/v1/audio-features/${track.id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (!featuresResponse.ok) {
+        throw new Error('Failed to get audio features');
+      }
+
+      const features = await featuresResponse.json() as SpotifyAudioFeatures;
+
+      // Translate to natural language
+      const description = translateToNaturalLanguage(
+        features,
+        track.name,
+        track.artists[0]?.name
+      );
+
+      Logger.info('music', 'Detected song mention', {
+        song: detected.song,
+        artist: detected.artist,
+        spotifyTrackId: track.id
+      });
+
+      res.json({
+        detected: true,
+        song: detected.song,
+        artist: detected.artist,
+        spotifyFound: true,
+        track: {
+          id: track.id,
+          name: track.name,
+          artist: track.artists[0]?.name,
+          album: track.album?.name,
+          imageUrl: track.album?.images?.[0]?.url
+        },
+        features,
+        description
+      });
+    } catch (error) {
+      Logger.error('music', 'Failed to detect/process song', error as Error);
+      res.status(500).json({ error: 'Failed to process song mention' });
+    }
+  });
+
+  // Share music description with Kindroid
+  app.post("/api/music/share-with-kindroid", async (req, res) => {
+    try {
+      const { description, trackName, artist, companionId } = req.body;
+
+      if (!description) {
+        return res.status(400).json({ error: 'Music description required' });
+      }
+
+      // Get companion's Kindroid credentials
+      const userId = 'default-user';
+      let kindroidBotId: string | null = null;
+      let kindroidApiKey: string | null = null;
+
+      if (companionId) {
+        // Get from specific companion
+        const companion = await db.select()
+          .from(schema.companions)
+          .where(eq(schema.companions.id, companionId))
+          .limit(1);
+
+        if (companion.length > 0 && companion[0].kindroidBotId && companion[0].kindroidApiKey) {
+          kindroidBotId = companion[0].kindroidBotId;
+          kindroidApiKey = decrypt(companion[0].kindroidApiKey);
+        }
+      }
+
+      if (!kindroidBotId || !kindroidApiKey) {
+        // Try to get from active companion
+        const activeCompanion = await db.select()
+          .from(schema.companions)
+          .where(and(
+            eq(schema.companions.userId, userId),
+            eq(schema.companions.isActive, true)
+          ))
+          .limit(1);
+
+        if (activeCompanion.length > 0 && activeCompanion[0].kindroidBotId && activeCompanion[0].kindroidApiKey) {
+          kindroidBotId = activeCompanion[0].kindroidBotId;
+          kindroidApiKey = decrypt(activeCompanion[0].kindroidApiKey);
+        }
+      }
+
+      if (!kindroidBotId || !kindroidApiKey) {
+        // Fall back to API credentials
+        const kindroidCred = await db.select()
+          .from(schema.apiCredentials)
+          .where(and(
+            eq(schema.apiCredentials.userId, userId),
+            eq(schema.apiCredentials.service, 'kindroid'),
+            eq(schema.apiCredentials.isActive, true)
+          ))
+          .limit(1);
+
+        if (kindroidCred.length > 0) {
+          kindroidApiKey = decrypt(kindroidCred[0].encryptedKey);
+          // Note: This doesn't have bot ID - need companion for that
+        }
+      }
+
+      if (!kindroidBotId || !kindroidApiKey) {
+        return res.status(400).json({
+          error: 'Kindroid not configured. Please set up a companion with Kindroid credentials.'
+        });
+      }
+
+      // Format the message for Kindroid
+      const formattedMessage = typeof description === 'string'
+        ? description
+        : formatForKindroid(description, true);
+
+      // Send to Kindroid
+      const kindroidUrl = process.env.KINDROID_API_URL || 'https://api.kindroid.ai/v1';
+      const kindroidResponse = await fetch(`${kindroidUrl}/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${kindroidApiKey}`
+        },
+        body: JSON.stringify({
+          ai_id: kindroidBotId,
+          message: formattedMessage
+        })
+      });
+
+      if (!kindroidResponse.ok) {
+        const errorText = await kindroidResponse.text();
+        throw new Error(`Kindroid API error: ${errorText}`);
+      }
+
+      const kindroidReply = await kindroidResponse.text();
+
+      Logger.info('music', 'Shared music with Kindroid', {
+        trackName,
+        artist,
+        kindroidBotId
+      });
+
+      res.json({
+        success: true,
+        shared: {
+          trackName,
+          artist,
+          description: formattedMessage
+        },
+        kindroidResponse: kindroidReply
+      });
+    } catch (error) {
+      Logger.error('music', 'Failed to share with Kindroid', error as Error);
+      res.status(500).json({ error: 'Failed to share music with Kindroid' });
+    }
+  });
+
+  // Combined endpoint: detect song, get features, and share with Kindroid
+  app.post("/api/music/share-song", async (req, res) => {
+    try {
+      const { message, trackId, trackName, artist, companionId, wavFilePath } = req.body;
+
+      let description: any;
+      let trackInfo: any = { name: trackName, artist };
+
+      // Option 1: Analyze from WAV file path
+      if (wavFilePath) {
+        const features = await analyzeWavFile(wavFilePath);
+        description = translateToNaturalLanguage(features, trackName || 'My Song', artist || 'Phoenix');
+        trackInfo = { name: trackName || 'My Song', artist: artist || 'Phoenix' };
+      }
+      // Option 2: Get from Spotify track ID
+      else if (trackId) {
+        const accessToken = await getSpotifyAccessToken();
+        if (!accessToken) {
+          return res.status(401).json({ error: 'Spotify not connected' });
+        }
+
+        // Get track and features in parallel
+        const [trackResponse, featuresResponse] = await Promise.all([
+          fetch(`https://api.spotify.com/v1/tracks/${trackId}`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          }),
+          fetch(`https://api.spotify.com/v1/audio-features/${trackId}`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          })
+        ]);
+
+        if (!trackResponse.ok || !featuresResponse.ok) {
+          throw new Error('Failed to get track data from Spotify');
+        }
+
+        const track = await trackResponse.json() as any;
+        const features = await featuresResponse.json() as SpotifyAudioFeatures;
+
+        trackInfo = {
+          id: track.id,
+          name: track.name,
+          artist: track.artists[0]?.name,
+          album: track.album?.name,
+          imageUrl: track.album?.images?.[0]?.url
+        };
+
+        description = translateToNaturalLanguage(features, track.name, track.artists[0]?.name);
+      }
+      // Option 3: Detect from message text
+      else if (message) {
+        const detected = detectSongMention(message);
+        if (!detected) {
+          return res.json({ detected: false, shared: false });
+        }
+
+        // Try to find on Spotify
+        const accessToken = await getSpotifyAccessToken();
+        if (accessToken) {
+          const searchQuery = `${detected.song} ${detected.artist}`;
+          const searchResponse = await fetch(
+            `https://api.spotify.com/v1/search?q=${encodeURIComponent(searchQuery)}&type=track&limit=1`,
+            { headers: { 'Authorization': `Bearer ${accessToken}` } }
+          );
+
+          if (searchResponse.ok) {
+            const searchData = await searchResponse.json() as any;
+            const track = searchData.tracks?.items?.[0];
+
+            if (track) {
+              const featuresResponse = await fetch(
+                `https://api.spotify.com/v1/audio-features/${track.id}`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+              );
+
+              if (featuresResponse.ok) {
+                const features = await featuresResponse.json() as SpotifyAudioFeatures;
+                trackInfo = {
+                  id: track.id,
+                  name: track.name,
+                  artist: track.artists[0]?.name,
+                  album: track.album?.name
+                };
+                description = translateToNaturalLanguage(features, track.name, track.artists[0]?.name);
+              }
+            }
+          }
+        }
+
+        // If Spotify lookup failed, use basic detection
+        if (!description) {
+          // Create a basic description without audio features
+          description = {
+            summary: `"${detected.song}" by ${detected.artist}`,
+            details: `Phoenix is sharing "${detected.song}" by ${detected.artist} with you.`,
+            mood: 'unknown',
+            style: 'unknown',
+            tempo: 'unknown'
+          };
+          trackInfo = { name: detected.song, artist: detected.artist };
+        }
+      } else {
+        return res.status(400).json({ error: 'Provide message, trackId, or wavFilePath' });
+      }
+
+      // Now share with Kindroid
+      const userId = 'default-user';
+      let kindroidBotId: string | null = null;
+      let kindroidApiKey: string | null = null;
+
+      // Get Kindroid credentials (same logic as share-with-kindroid endpoint)
+      if (companionId) {
+        const companion = await db.select()
+          .from(schema.companions)
+          .where(eq(schema.companions.id, companionId))
+          .limit(1);
+
+        if (companion.length > 0 && companion[0].kindroidBotId && companion[0].kindroidApiKey) {
+          kindroidBotId = companion[0].kindroidBotId;
+          kindroidApiKey = decrypt(companion[0].kindroidApiKey);
+        }
+      }
+
+      if (!kindroidBotId || !kindroidApiKey) {
+        const activeCompanion = await db.select()
+          .from(schema.companions)
+          .where(and(
+            eq(schema.companions.userId, userId),
+            eq(schema.companions.isActive, true)
+          ))
+          .limit(1);
+
+        if (activeCompanion.length > 0 && activeCompanion[0].kindroidBotId && activeCompanion[0].kindroidApiKey) {
+          kindroidBotId = activeCompanion[0].kindroidBotId;
+          kindroidApiKey = decrypt(activeCompanion[0].kindroidApiKey);
+        }
+      }
+
+      if (!kindroidBotId || !kindroidApiKey) {
+        return res.json({
+          detected: true,
+          track: trackInfo,
+          description,
+          shared: false,
+          reason: 'No Kindroid configured'
+        });
+      }
+
+      // Send to Kindroid
+      const kindroidUrl = process.env.KINDROID_API_URL || 'https://api.kindroid.ai/v1';
+      const formattedMessage = formatForKindroid(description, true);
+
+      const kindroidResponse = await fetch(`${kindroidUrl}/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${kindroidApiKey}`
+        },
+        body: JSON.stringify({
+          ai_id: kindroidBotId,
+          message: formattedMessage
+        })
+      });
+
+      const kindroidReply = kindroidResponse.ok ? await kindroidResponse.text() : null;
+
+      Logger.info('music', 'Shared song with Kindroid', {
+        track: trackInfo.name,
+        artist: trackInfo.artist
+      });
+
+      res.json({
+        detected: true,
+        track: trackInfo,
+        description,
+        shared: true,
+        kindroidResponse: kindroidReply
+      });
+    } catch (error) {
+      Logger.error('music', 'Failed to share song', error as Error);
+      res.status(500).json({ error: 'Failed to share song' });
+    }
+  });
+
+  // --- END MUSIC SHARING ROUTES ---
 
   // Debug endpoints - temporary
   app.get("/debug/users", async (req, res) => {
