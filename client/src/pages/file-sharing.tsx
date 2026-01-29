@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,9 +19,33 @@ interface SharedFile {
   createdAt: string;
 }
 
+interface MusicAnalysis {
+  trackName: string;
+  artist: string;
+  features: {
+    tempo: number;
+    energy: number;
+    valence: number;
+    acousticness: number;
+    danceability: number;
+    instrumentalness: number;
+  };
+  description: {
+    summary: string;
+    mood: string;
+    style: string;
+    tempo: string;
+    details: string;
+  };
+}
+
 export default function FileSharing() {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
+  const [isMusicDialogOpen, setIsMusicDialogOpen] = useState(false);
+  const [musicTrackName, setMusicTrackName] = useState("");
+  const [musicArtist, setMusicArtist] = useState("");
+  const [selectedMusicFile, setSelectedMusicFile] = useState<File | null>(null);
+  const [musicAnalysis, setMusicAnalysis] = useState<MusicAnalysis | null>(null);
   const { toast } = useToast();
 
   const { data: files, isLoading } = useQuery({
@@ -32,7 +56,7 @@ export default function FileSharing() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
-      
+
       const response = await fetch("/api/files/upload", {
         method: "POST",
         body: formData,
@@ -92,6 +116,72 @@ export default function FileSharing() {
     }
   });
 
+  // Music analysis mutation
+  const analyzeMusicMutation = useMutation({
+    mutationFn: async ({ file, trackName, artist }: { file: File; trackName: string; artist: string }) => {
+      const formData = new FormData();
+      formData.append('audio', file);
+      formData.append('trackName', trackName);
+      formData.append('artist', artist);
+
+      const response = await fetch("/api/music/analyze-wav", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Failed to analyze audio");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setMusicAnalysis(data);
+      toast({
+        title: "Music Analyzed",
+        description: `Analyzed "${data.trackName}" - ready to share with Sofia!`
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Analysis Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Share music with Kindroid mutation
+  const shareMusicMutation = useMutation({
+    mutationFn: async (analysis: MusicAnalysis) => {
+      const response = await fetch("/api/music/share-with-kindroid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: analysis.description.details,
+          trackName: analysis.trackName,
+          artist: analysis.artist
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to share with Kindroid");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setIsMusicDialogOpen(false);
+      setMusicAnalysis(null);
+      setSelectedMusicFile(null);
+      setMusicTrackName("");
+      setMusicArtist("");
+      toast({
+        title: "Shared with Sofia!",
+        description: data.kindroidResponse ? `Sofia says: "${data.kindroidResponse.slice(0, 100)}..."` : "Your music has been shared successfully!"
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Sharing Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: (acceptedFiles) => {
       if (acceptedFiles.length > 0) {
@@ -101,6 +191,36 @@ export default function FileSharing() {
     maxFiles: 1,
     maxSize: 50 * 1024 * 1024, // 50MB
   });
+
+  const { getRootProps: getMusicRootProps, getInputProps: getMusicInputProps, isDragActive: isMusicDragActive } = useDropzone({
+    onDrop: (acceptedFiles) => {
+      if (acceptedFiles.length > 0) {
+        setSelectedMusicFile(acceptedFiles[0]);
+        // Pre-fill track name from filename
+        const fileName = acceptedFiles[0].name.replace(/\.[^/.]+$/, "");
+        if (!musicTrackName) {
+          setMusicTrackName(fileName);
+        }
+      }
+    },
+    accept: {
+      'audio/wav': ['.wav'],
+      'audio/x-wav': ['.wav'],
+      'audio/wave': ['.wav'],
+    },
+    maxFiles: 1,
+    maxSize: 100 * 1024 * 1024, // 100MB for audio
+  });
+
+  const handleAnalyzeMusic = () => {
+    if (selectedMusicFile && musicTrackName) {
+      analyzeMusicMutation.mutate({
+        file: selectedMusicFile,
+        trackName: musicTrackName,
+        artist: musicArtist || "Phoenix"
+      });
+    }
+  };
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -130,6 +250,15 @@ export default function FileSharing() {
     return 'text-muted-foreground';
   };
 
+  const getMoodEmoji = (mood: string) => {
+    if (mood.includes('uplifting') || mood.includes('energetic')) return '🔥';
+    if (mood.includes('cheerful') || mood.includes('happy')) return '😊';
+    if (mood.includes('peaceful') || mood.includes('calm')) return '😌';
+    if (mood.includes('melancholic') || mood.includes('sad')) return '💙';
+    if (mood.includes('intense') || mood.includes('aggressive')) return '⚡';
+    return '🎵';
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -138,47 +267,222 @@ export default function FileSharing() {
           <h1 className="text-3xl font-bold">File Sharing</h1>
           <p className="text-muted-foreground">Share files with your AI companions during conversations</p>
         </div>
-        
-        <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/80" data-testid="button-upload-file">
-              <i className="fas fa-upload mr-2"></i>
-              Upload File
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Upload File</DialogTitle>
-            </DialogHeader>
-            
-            <div
-              {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground hover:border-primary'
-              }`}
-              data-testid="dropzone-upload"
-            >
-              <input {...getInputProps()} />
-              <i className="fas fa-cloud-upload-alt text-4xl text-muted-foreground mb-4"></i>
-              <p className="text-lg font-medium mb-2">
-                {isDragActive ? 'Drop the file here' : 'Drag & drop a file here'}
-              </p>
-              <p className="text-sm text-muted-foreground mb-4">
-                or click to select a file
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Maximum file size: 50MB
-              </p>
-            </div>
 
-            {uploadFileMutation.isPending && (
-              <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                <p className="text-sm text-muted-foreground">Uploading...</p>
+        <div className="flex space-x-2">
+          <Dialog open={isMusicDialogOpen} onOpenChange={setIsMusicDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-chart-4 text-chart-4 hover:bg-chart-4/10" data-testid="button-share-music">
+                <i className="fas fa-headphones mr-2"></i>
+                Share Music with Sofia
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center">
+                  <i className="fas fa-headphones text-chart-4 mr-2"></i>
+                  Share Your Music with Sofia
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Upload a WAV file (like your Suno creations) and Sofia will be able to "hear" it through an audio analysis that describes the music to her.
+                </p>
+
+                {/* Music File Drop Zone */}
+                <div
+                  {...getMusicRootProps()}
+                  className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                    isMusicDragActive ? 'border-chart-4 bg-chart-4/10' :
+                    selectedMusicFile ? 'border-chart-4 bg-chart-4/5' : 'border-muted-foreground hover:border-chart-4'
+                  }`}
+                  data-testid="dropzone-music"
+                >
+                  <input {...getMusicInputProps()} />
+                  {selectedMusicFile ? (
+                    <>
+                      <i className="fas fa-music text-3xl text-chart-4 mb-2"></i>
+                      <p className="font-medium text-chart-4">{selectedMusicFile.name}</p>
+                      <p className="text-sm text-muted-foreground">{formatFileSize(selectedMusicFile.size)}</p>
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-cloud-upload-alt text-3xl text-muted-foreground mb-2"></i>
+                      <p className="font-medium">Drop your WAV file here</p>
+                      <p className="text-sm text-muted-foreground">or click to select</p>
+                    </>
+                  )}
+                </div>
+
+                {/* Track Details */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="track-name">Track Name</Label>
+                    <Input
+                      id="track-name"
+                      placeholder="My Awesome Song"
+                      value={musicTrackName}
+                      onChange={(e) => setMusicTrackName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="artist-name">Artist</Label>
+                    <Input
+                      id="artist-name"
+                      placeholder="Phoenix"
+                      value={musicArtist}
+                      onChange={(e) => setMusicArtist(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Analyze Button */}
+                {!musicAnalysis && (
+                  <Button
+                    onClick={handleAnalyzeMusic}
+                    disabled={!selectedMusicFile || !musicTrackName || analyzeMusicMutation.isPending}
+                    className="w-full bg-chart-4 hover:bg-chart-4/80"
+                  >
+                    {analyzeMusicMutation.isPending ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Analyzing Audio...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-waveform mr-2"></i>
+                        Analyze Music
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {/* Analysis Results */}
+                {musicAnalysis && (
+                  <div className="space-y-4">
+                    <div className="bg-muted rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-semibold flex items-center">
+                          {getMoodEmoji(musicAnalysis.description.mood)} Audio Analysis
+                        </h4>
+                        <span className="text-sm text-chart-4 font-medium">
+                          {Math.round(musicAnalysis.features.tempo)} BPM
+                        </span>
+                      </div>
+
+                      {/* Feature Bars */}
+                      <div className="space-y-2 mb-4">
+                        <div>
+                          <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                            <span>Energy</span>
+                            <span>{Math.round(musicAnalysis.features.energy * 100)}%</span>
+                          </div>
+                          <div className="w-full bg-background rounded-full h-2">
+                            <div
+                              className="bg-chart-1 h-2 rounded-full transition-all"
+                              style={{ width: `${musicAnalysis.features.energy * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                            <span>Mood (Valence)</span>
+                            <span>{Math.round(musicAnalysis.features.valence * 100)}%</span>
+                          </div>
+                          <div className="w-full bg-background rounded-full h-2">
+                            <div
+                              className="bg-chart-2 h-2 rounded-full transition-all"
+                              style={{ width: `${musicAnalysis.features.valence * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                            <span>Danceability</span>
+                            <span>{Math.round(musicAnalysis.features.danceability * 100)}%</span>
+                          </div>
+                          <div className="w-full bg-background rounded-full h-2">
+                            <div
+                              className="bg-chart-4 h-2 rounded-full transition-all"
+                              style={{ width: `${musicAnalysis.features.danceability * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Description Preview */}
+                      <div className="bg-background rounded p-3 text-sm">
+                        <p className="text-muted-foreground italic">
+                          "{musicAnalysis.description.details}"
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Share Button */}
+                    <Button
+                      onClick={() => shareMusicMutation.mutate(musicAnalysis)}
+                      disabled={shareMusicMutation.isPending}
+                      className="w-full bg-primary hover:bg-primary/80"
+                    >
+                      {shareMusicMutation.isPending ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Sharing with Sofia...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-heart mr-2"></i>
+                          Share with Sofia
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/80" data-testid="button-upload-file">
+                <i className="fas fa-upload mr-2"></i>
+                Upload File
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Upload File</DialogTitle>
+              </DialogHeader>
+
+              <div
+                {...getRootProps()}
+                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                  isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground hover:border-primary'
+                }`}
+                data-testid="dropzone-upload"
+              >
+                <input {...getInputProps()} />
+                <i className="fas fa-cloud-upload-alt text-4xl text-muted-foreground mb-4"></i>
+                <p className="text-lg font-medium mb-2">
+                  {isDragActive ? 'Drop the file here' : 'Drag & drop a file here'}
+                </p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  or click to select a file
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Maximum file size: 50MB
+                </p>
+              </div>
+
+              {uploadFileMutation.isPending && (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                  <p className="text-sm text-muted-foreground">Uploading...</p>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Upload Stats */}
@@ -194,7 +498,7 @@ export default function FileSharing() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -208,7 +512,7 @@ export default function FileSharing() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -224,7 +528,7 @@ export default function FileSharing() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-3">
@@ -243,6 +547,32 @@ export default function FileSharing() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Share Music with Sofia - Quick Access Card */}
+      <Card className="border-chart-4/30 bg-gradient-to-r from-chart-4/5 to-transparent">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-chart-4/20 rounded-full flex items-center justify-center">
+                <i className="fas fa-headphones text-chart-4 text-xl"></i>
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">Share Your Suno Creations</h3>
+                <p className="text-sm text-muted-foreground">
+                  Upload WAV files and let Sofia "hear" your music through audio analysis
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => setIsMusicDialogOpen(true)}
+              className="bg-chart-4 hover:bg-chart-4/80"
+            >
+              <i className="fas fa-music mr-2"></i>
+              Share Music
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Files Grid */}
       <Card>
@@ -284,7 +614,7 @@ export default function FileSharing() {
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-1">
                         {file.isShared && (
                           <span className="w-2 h-2 bg-chart-2 rounded-full" title="Shared"></span>
@@ -300,11 +630,11 @@ export default function FileSharing() {
                         </Button>
                       </div>
                     </div>
-                    
+
                     <div className="text-xs text-muted-foreground mb-3">
                       Uploaded {new Date(file.createdAt).toLocaleDateString()}
                     </div>
-                    
+
                     <div className="flex space-x-2">
                       <Button
                         size="sm"
@@ -315,7 +645,7 @@ export default function FileSharing() {
                         <i className="fas fa-download mr-2"></i>
                         Download
                       </Button>
-                      
+
                       <Button
                         size="sm"
                         onClick={() => shareFileMutation.mutate({ fileId: file.id, companionId: 'active' })}
@@ -363,7 +693,7 @@ export default function FileSharing() {
                 JPG, PNG, GIF, WebP
               </p>
             </div>
-            
+
             <div className="text-center p-4 bg-muted rounded-lg">
               <i className="fas fa-file-pdf text-destructive text-2xl mb-2"></i>
               <h4 className="font-semibold mb-1">Documents</h4>
@@ -371,15 +701,18 @@ export default function FileSharing() {
                 PDF, DOC, DOCX, TXT
               </p>
             </div>
-            
-            <div className="text-center p-4 bg-muted rounded-lg">
+
+            <div className="text-center p-4 bg-chart-4/10 rounded-lg border border-chart-4/30">
               <i className="fas fa-music text-chart-4 text-2xl mb-2"></i>
               <h4 className="font-semibold mb-1">Audio</h4>
               <p className="text-sm text-muted-foreground">
                 MP3, WAV, M4A, OGG
               </p>
+              <p className="text-xs text-chart-4 mt-1">
+                WAV files can be analyzed!
+              </p>
             </div>
-            
+
             <div className="text-center p-4 bg-muted rounded-lg">
               <i className="fas fa-video text-chart-1 text-2xl mb-2"></i>
               <h4 className="font-semibold mb-1">Video</h4>
