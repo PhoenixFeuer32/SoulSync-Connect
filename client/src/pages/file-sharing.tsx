@@ -189,7 +189,7 @@ export default function FileSharing() {
       }
     },
     maxFiles: 1,
-    maxSize: 50 * 1024 * 1024, // 50MB
+    maxSize: 80 * 1024 * 1024, // 80MB
   });
 
   const { getRootProps: getMusicRootProps, getInputProps: getMusicInputProps, isDragActive: isMusicDragActive } = useDropzone({
@@ -470,7 +470,7 @@ export default function FileSharing() {
                   or click to select a file
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Maximum file size: 50MB
+                  Maximum file size: 80MB
                 </p>
               </div>
 
