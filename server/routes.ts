@@ -1180,7 +1180,23 @@ async function ensureDefaultUser() {
       }
 
       if (!kindroidBotId || !kindroidApiKey) {
-        // Fall back to API credentials
+        // Try ANY companion with Kindroid credentials (not just active)
+        const anyCompanion = await db.select()
+          .from(schema.companions)
+          .where(eq(schema.companions.userId, userId))
+          .limit(10);
+
+        for (const comp of anyCompanion) {
+          if (comp.kindroidBotId && comp.kindroidApiKey) {
+            kindroidBotId = comp.kindroidBotId;
+            kindroidApiKey = decrypt(comp.kindroidApiKey);
+            break;
+          }
+        }
+      }
+
+      if (!kindroidBotId || !kindroidApiKey) {
+        // Fall back to API credentials for API key + look for bot ID elsewhere
         const kindroidCred = await db.select()
           .from(schema.apiCredentials)
           .where(and(
@@ -1192,7 +1208,10 @@ async function ensureDefaultUser() {
 
         if (kindroidCred.length > 0) {
           kindroidApiKey = decrypt(kindroidCred[0].encryptedKey);
-          // Note: This doesn't have bot ID - need companion for that
+          // Check if encryptedSecret has the bot ID
+          if (kindroidCred[0].encryptedSecret) {
+            kindroidBotId = decrypt(kindroidCred[0].encryptedSecret);
+          }
         }
       }
 

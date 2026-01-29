@@ -18,12 +18,27 @@ interface CompanionForm {
   voiceId: string;
   voiceProvider: string;
   kindroidBotId: string;
+  kindroidApiKey: string;
+}
+
+interface Companion {
+  id: string;
+  name: string;
+  description?: string;
+  personality?: string;
+  voiceId?: string;
+  voiceProvider?: string;
+  kindroidBotId?: string;
+  kindroidApiKey?: string;
+  isActive: boolean;
+  createdAt: string;
 }
 
 export default function Companions() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCompanion, setEditingCompanion] = useState<Companion | null>(null);
   const { toast } = useToast();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CompanionForm>();
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<CompanionForm>();
 
   const { data: companions, isLoading } = useQuery({
     queryKey: ["/api/companions"],
@@ -91,8 +106,59 @@ export default function Companions() {
     },
   });
 
+  const updateCompanionMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: CompanionForm }) => {
+      const response = await fetch(`/api/companions/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to update companion");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/companions"] });
+      setIsDialogOpen(false);
+      setEditingCompanion(null);
+      reset();
+      toast({
+        title: "Companion Updated",
+        description: "Your companion has been updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: CompanionForm) => {
-    createCompanionMutation.mutate(data);
+    if (editingCompanion) {
+      updateCompanionMutation.mutate({ id: editingCompanion.id, data });
+    } else {
+      createCompanionMutation.mutate(data);
+    }
+  };
+
+  const openEditDialog = (companion: Companion) => {
+    setEditingCompanion(companion);
+    setValue("name", companion.name);
+    setValue("description", companion.description || "");
+    setValue("personality", companion.personality || "");
+    setValue("voiceId", companion.voiceId || "");
+    setValue("voiceProvider", companion.voiceProvider || "elevenlabs");
+    setValue("kindroidBotId", companion.kindroidBotId || "");
+    setValue("kindroidApiKey", ""); // Don't pre-fill API key for security
+    setIsDialogOpen(true);
+  };
+
+  const openCreateDialog = () => {
+    setEditingCompanion(null);
+    reset();
+    setIsDialogOpen(true);
   };
 
   if (isLoading) {
@@ -112,16 +178,22 @@ export default function Companions() {
           <p className="text-muted-foreground">Manage your AI companions and their personalities</p>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) {
+            setEditingCompanion(null);
+            reset();
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/80" data-testid="button-add-companion">
+            <Button className="bg-primary hover:bg-primary/80" onClick={openCreateDialog} data-testid="button-add-companion">
               <i className="fas fa-plus mr-2"></i>
               Add Companion
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Create New Companion</DialogTitle>
+              <DialogTitle>{editingCompanion ? "Edit Companion" : "Create New Companion"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
@@ -197,6 +269,23 @@ export default function Companions() {
                 </p>
               </div>
 
+              <div>
+                <Label htmlFor="kindroidApiKey">Kindroid API Key</Label>
+                <Input
+                  id="kindroidApiKey"
+                  type="password"
+                  {...register("kindroidApiKey", { required: !editingCompanion ? "Kindroid API Key is required" : false })}
+                  placeholder={editingCompanion ? "Leave blank to keep existing" : "Enter Kindroid API Key"}
+                  data-testid="input-kindroid-api-key"
+                />
+                {errors.kindroidApiKey && (
+                  <p className="text-sm text-destructive mt-1">{errors.kindroidApiKey.message}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  {editingCompanion ? "Leave blank to keep the existing API key" : "Your Kindroid API key for authentication"}
+                </p>
+              </div>
+
               <div className="flex justify-end space-x-2">
                 <Button
                   type="button"
@@ -208,10 +297,13 @@ export default function Companions() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={createCompanionMutation.isPending}
+                  disabled={createCompanionMutation.isPending || updateCompanionMutation.isPending}
                   data-testid="button-create-companion"
                 >
-                  {createCompanionMutation.isPending ? "Creating..." : "Create Companion"}
+                  {editingCompanion
+                    ? (updateCompanionMutation.isPending ? "Saving..." : "Save Changes")
+                    : (createCompanionMutation.isPending ? "Creating..." : "Create Companion")
+                  }
                 </Button>
               </div>
             </form>
@@ -222,7 +314,7 @@ export default function Companions() {
       {/* Companions Grid */}
       {companions && companions.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {companions.map((companion: any) => (
+          {companions.map((companion: Companion) => (
             <Card key={companion.id} className={`relative ${companion.isActive ? 'ring-2 ring-primary' : ''}`}>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -239,15 +331,26 @@ export default function Companions() {
                       )}
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteCompanionMutation.mutate(companion.id)}
-                    className="text-muted-foreground hover:text-destructive"
-                    data-testid={`button-delete-${companion.id}`}
-                  >
-                    <i className="fas fa-trash text-sm"></i>
-                  </Button>
+                  <div className="flex space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEditDialog(companion)}
+                      className="text-muted-foreground hover:text-primary"
+                      data-testid={`button-edit-${companion.id}`}
+                    >
+                      <i className="fas fa-edit text-sm"></i>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteCompanionMutation.mutate(companion.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                      data-testid={`button-delete-${companion.id}`}
+                    >
+                      <i className="fas fa-trash text-sm"></i>
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
